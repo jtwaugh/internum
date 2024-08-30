@@ -22,9 +22,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     // Initialize the scene, camera, and renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(75, 1.5, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(Math.min(600, window.innerWidth), Math.min(400, window.innerHeight));
+    renderer.setSize(600, 400);
     mountRef.current.appendChild(renderer.domElement);
     sceneRef.current = scene;
 
@@ -111,47 +111,50 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   // Handle WASD movement based on camera's local axes
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!cameraRef.current) return;
+    if (typeof window !== 'undefined') {
 
-      const moveSpeed = 2;
-      const direction = new THREE.Vector3();
-      cameraRef.current.getWorldDirection(direction);
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (!cameraRef.current) return;
 
-      switch (event.key) {
-        case 'w':
-          cameraRef.current.position.addScaledVector(direction, moveSpeed);
-          break;
-        case 's':
-          cameraRef.current.position.addScaledVector(direction, -moveSpeed);
-          break;
-        case 'a':
-          const rightVector = new THREE.Vector3();
-          cameraRef.current.getWorldDirection(direction);
-          rightVector.crossVectors(cameraRef.current.up, direction).normalize();aa
-          cameraRef.current.position.addScaledVector(rightVector, -moveSpeed);
-          break;
-        case 'd':
-          const leftVector = new THREE.Vector3();
-          cameraRef.current.getWorldDirection(direction);
-          leftVector.crossVectors(cameraRef.current.up, direction).normalize();
-          cameraRef.current.position.addScaledVector(leftVector, moveSpeed);
-          break;
-      }
-    };
+        const moveSpeed = 2;
+        const direction = new THREE.Vector3();
+        cameraRef.current.getWorldDirection(direction);
 
-    window.addEventListener('keydown', handleKeyDown);
+        switch (event.key) {
+          case 'w':
+            cameraRef.current.position.addScaledVector(direction, moveSpeed);
+            break;
+          case 's':
+            cameraRef.current.position.addScaledVector(direction, -moveSpeed);
+            break;
+          case 'a':
+            const rightVector = new THREE.Vector3();
+            cameraRef.current.getWorldDirection(direction);
+            rightVector.crossVectors(cameraRef.current.up, direction).normalize();
+            cameraRef.current.position.addScaledVector(rightVector, -moveSpeed);
+            break;
+          case 'd':
+            const leftVector = new THREE.Vector3();
+            cameraRef.current.getWorldDirection(direction);
+            leftVector.crossVectors(cameraRef.current.up, direction).normalize();
+            cameraRef.current.position.addScaledVector(leftVector, moveSpeed);
+            break;
+        }
+      };
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
     };
   }, []);
 
   return (
     <div className='p-4'>
       <div ref={mountRef} style={{
-        width: Math.min(600, window.innerWidth),  // Adjust the width of the container
-        height: Math.min(400, window.innerHeight), // Adjust the height of the container
+        width: 600,  // Adjust the width of the container
+        height: 400, // Adjust the height of the container
         border: '1px solid black' // Optional: add a border for visual reference
       }} />
 

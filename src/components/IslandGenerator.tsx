@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import p5 from 'p5';
 import * as THREE from 'three';
 import { Slider } from '@/components/ui/slider';
@@ -105,7 +105,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
         for (let y = 1; y < canvasSize - 1; y++) {
           // Average the current cell's value with its 8 neighbors
           newHeightmap[x][y] = (
-            oldHeightmap[x][y] * 5 +
+            oldHeightmap[x][y] * 3 +
             oldHeightmap[x - 1][y] +
             oldHeightmap[x + 1][y] +
             oldHeightmap[x][y - 1] +
@@ -114,7 +114,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
             oldHeightmap[x - 1][y + 1] +
             oldHeightmap[x + 1][y - 1] +
             oldHeightmap[x + 1][y + 1]
-          ) / 13;
+          ) / 11;
           // console.log(heightmap[x][y], " -> ", blurredHeightmap[x][y]);
         }
       }
@@ -143,12 +143,11 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       // Set the Z value (height) from the heightmap
       geometry.attributes.position.setZ(i / 3, heightmap[x][y] * 10); // Adjust multiplier for height scaling
 
-      // Map the height to a color (e.g., blue to green to brown)
       let color;
       if (heightmap[x][y] < 0.001) {
-        color = new THREE.Color(0x0000ff); // Blue for water
+        color = new THREE.Color(0x0000ff);
       } else {
-        color = new THREE.Color((10 * heightmap[x][y]), 100 + (10 * heightmap[x][y]), (10 * heightmap[x][y])); // Green for low land
+        color = new THREE.Color((8 * heightmap[x][y]), 50 + (8 * heightmap[x][y]), (8 * heightmap[x][y]));
       }
 
       colors.push(color.r, color.g, color.b);
