@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import p5 from 'p5';
-import * as THREE from 'three';
 
+import { TEMPLE_RADIUS } from '@/constants';
 import { Slider } from '@/components/ui/slider';
 import { Button } from './ui/button';
 
@@ -241,7 +241,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     const blurredHeightmap = blurHeightmap(heightmap);
   
     const townSquarePosition = getRandomLandTile(blurredHeightmap);
-    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, 5);
+    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, TEMPLE_RADIUS);
     const docksPosition = findClosestWaterBorder(blurredHeightmap, townSquarePosition);
 
     props.onWorldGenerated({heightmap: blurredHeightmap, townSquare: townSquarePosition, temple: templePosition, docks: docksPosition});

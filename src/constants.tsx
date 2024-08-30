@@ -1,0 +1,1 @@
+export const TEMPLE_RADIUS = 10;

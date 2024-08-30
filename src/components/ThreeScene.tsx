@@ -233,13 +233,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     const townSquarePosition = new THREE.Vector3(
       props.world!.townSquare.x - meshRef.current!.geometry.parameters.width / 2,
-      props.world!.townSquare.y - meshRef.current!.geometry.parameters.height / 2,
+      (props.world.heightmap.length - props.world!.townSquare.y) - meshRef.current!.geometry.parameters.height / 2,
       10 // Z position above the ground
     );
-
-    cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Position the camera directly above
-    cameraRef.current.lookAt(townSquarePosition.x, townSquarePosition.y, 0); // Point the camera downward
-    controlsRef.current.update(); // Update the controls to reflect the new camera position
+    cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
+    controlsRef.current.target.copy(townSquarePosition); // Set the controls' target to the town square
+    controlsRef.current.update();
   };
 
   // Handle WASD movement based on camera's local axes
