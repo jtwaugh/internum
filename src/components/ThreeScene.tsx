@@ -2,20 +2,90 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
-interface ThreeSceneProps {
-  mesh: THREE.Mesh | null;
+import { World } from '@/types';
+
+export interface ThreeSceneProps {
+  world: World | null;
 }
 
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
+  const meshRef = useRef<THREE.Mesh | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+
+  const generateMesh = (heightmap: number[][]) => {
+    const canvasSize = heightmap.length;
+
+    const geometry = new THREE.PlaneGeometry(
+      canvasSize,
+      canvasSize,
+      canvasSize - 1,
+      canvasSize - 1
+    );
+
+    let colors = [];
+
+    for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
+      const x = Math.floor((i / 3) % canvasSize);
+      const y = Math.floor(i / 3 / canvasSize);
+
+      // Set the Z value (height) from the heightmap
+      geometry.attributes.position.setZ(i / 3, heightmap[x][y] * 10); // Adjust multiplier for height scaling
+
+      let color;
+      if (heightmap[x][y] < 0.001) {
+        color = new THREE.Color(0x0000ff);
+      } else {
+        color = new THREE.Color((8 * heightmap[x][y]), 50 + (8 * heightmap[x][y]), (8 * heightmap[x][y]));
+      }
+
+      // DEBUG
+      if (x === props.world?.townSquare.x && y === props.world?.townSquare.y) {
+        color = new THREE.Color(0xff00ff);
+      }
+
+      colors.push(color.r, color.g, color.b);
+    }
+
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      flatShading: true,
+    });
+
+    const retMesh = new THREE.Mesh(geometry, material);
+
+    return retMesh;
+  };
+
+  const createThickLine = (start: THREE.Vector3, end: THREE.Vector3, color: number): THREE.Mesh => {
+    const height = start.distanceTo(end);
+    const geometry = new THREE.CylinderGeometry(0.5, 0.5, height, 32); // Adjust the radius for thickness
+    const material = new THREE.MeshBasicMaterial({ color });
+    const cylinder = new THREE.Mesh(geometry, material);
+  
+    // Position the cylinder between start and end
+    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    cylinder.position.copy(midpoint);
+  
+    // Orient the cylinder to align with the start and end points
+    const direction = new THREE.Vector3().subVectors(end, start).normalize();
+    const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
+    const angle = Math.acos(new THREE.Vector3(0, 1, 0).dot(direction));
+    cylinder.quaternion.setFromAxisAngle(axis, angle);
+  
+    return cylinder;
+  };
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -63,10 +133,58 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }, []);
 
   useEffect(() => {
-    if (props.mesh && sceneRef.current) {
-      console.log(props.mesh);
+    if (!props.world) return;
+    if (props.world.heightmap && sceneRef.current) {
+      const mesh = generateMesh(props.world.heightmap);
+      meshRef.current = mesh;
+      
+      console.log(mesh);
       sceneRef.current.clear(); // Clear previous mesh
-      sceneRef.current.add(props.mesh); // Add the new mesh
+      sceneRef.current.add(mesh); // Add the new mesh
+
+      const townSquarePosition = new THREE.Vector3(
+        props.world.townSquare.x - mesh.geometry.parameters.width / 2,
+        (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
+        props.world.heightmap[props.world.townSquare.x][(props.world.heightmap.length - props.world.townSquare.y)] 
+      );
+
+      const docksPosition = new THREE.Vector3(
+        props.world.docks.x - mesh.geometry.parameters.width / 2,
+        (props.world.heightmap.length - props.world.docks.y) - mesh.geometry.parameters.height / 2,
+        props.world.heightmap[props.world.docks.x][(props.world.heightmap.length - props.world.docks.y)]
+      );
+
+      const templePosition = new THREE.Vector3(
+        props.world.temple.x - mesh.geometry.parameters.width / 2,
+        (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
+        props.world.heightmap[props.world.temple.x][(props.world.heightmap.length - props.world.temple.y)]
+      );
+
+      const townSquareTop = new THREE.Vector3(
+        townSquarePosition.x,
+        townSquarePosition.y,
+        townSquarePosition.z + 10
+      );
+
+      const docksTop = new THREE.Vector3(
+        docksPosition.x,
+        docksPosition.y,
+        docksPosition.z + 10
+      );
+
+      const templeTop = new THREE.Vector3(
+        templePosition.x,
+        templePosition.y,
+        templePosition.z + 10
+      );
+
+      const townSquareLine = createThickLine(townSquarePosition, townSquareTop, 0xff00ff);
+      const docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
+      const templeLine = createThickLine(templePosition, templeTop, 0xffff00);
+      
+      sceneRef.current.add(townSquareLine);
+      sceneRef.current.add(docksLine);
+      sceneRef.current.add(templeLine);
 
       if (ambientLightRef.current) {
         sceneRef.current.add(ambientLightRef.current);
@@ -76,7 +194,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         sceneRef.current.add(lightRef.current);
       }
     }
-  }, [props.mesh]);
+  }, [props.world]);
 
   // Adjust the camera's field of view (FOV) for zooming
   const handleZoomIn = () => {
@@ -107,6 +225,21 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       cameraRef.current.position.set(100, 100, 100);
       controlsRef.current.reset();
     }
+  };
+
+  // Function to move the camera directly above the town square
+  const moveCameraAboveTownSquare = () => {
+    if (!cameraRef.current || !controlsRef.current || !props.world || !meshRef.current) return;
+
+    const townSquarePosition = new THREE.Vector3(
+      props.world!.townSquare.x - meshRef.current!.geometry.parameters.width / 2,
+      props.world!.townSquare.y - meshRef.current!.geometry.parameters.height / 2,
+      10 // Z position above the ground
+    );
+
+    cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Position the camera directly above
+    cameraRef.current.lookAt(townSquarePosition.x, townSquarePosition.y, 0); // Point the camera downward
+    controlsRef.current.update(); // Update the controls to reflect the new camera position
   };
 
   // Handle WASD movement based on camera's local axes
@@ -159,10 +292,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       }} />
 
       <Button 
-        className="reset-button" 
         onClick={handleResetView}
         style={{ position: 'relative', bottom: '-20px', right: '-10px', zIndex: 10 }}>
         Reset View
+      </Button>
+      <Button  
+        onClick={moveCameraAboveTownSquare}
+        style={{ position: 'relative', bottom: '-20px', right: '-60px', zIndex: 10 }}>
+        Go to Town Center
       </Button>
     </div>
   );

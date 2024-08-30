@@ -15,18 +15,19 @@ const IslandGenerator = dynamic(() => import('../components/IslandGenerator'), {
 
 import { useState, useEffect } from "react";
 
+import { World } from '@/types';
 
 export default function Home() {
-  const [currentMesh, setCurrentMesh] = useState<THREE.Mesh | null>(null);
+  const [currentWorld, setCurrentWorld] = useState<World | null>(null);
 
   useEffect(() => {
     //console.log(currentMesh);
-  }, [currentMesh]);
+  }, [currentWorld]);
 
   return (
     <div>
-      <IslandGenerator onMeshGenerated={setCurrentMesh} />
-      <ThreeScene mesh={currentMesh}/>
+      <IslandGenerator onWorldGenerated={setCurrentWorld} />
+      <ThreeScene world={currentWorld}/>
     </div>
   );
 }
