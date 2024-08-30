@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import p5 from 'p5';
-import * as THREE from 'three';
+
+import { TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS, MESH_THICKNESS } from '@/constants';
 import { Slider } from '@/components/ui/slider';
 import { Button } from './ui/button';
 
+import { World } from '@/types';
+
 interface IslandGeneratorProps {
-  onMeshGenerated: (mesh: THREE.Mesh | null) => void;
+  onWorldGenerated: (world: World | null) => void;
 }
 
 const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorProps) => {
@@ -16,8 +19,9 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
   const [canvasSize, setCanvasSize] = useState(400);
   const [threshold, setThreshold] = useState(0.5);
   const [maxDistanceFactor, setMaxDistanceFactor] = useState(1);
-  const [generate, setGenerate] = useState(false);
   const [blurIterations, setBlurIterations] = useState(1);
+
+  // Section for island generation
 
   const generateHeightmap = (p: p5): number[][] => {
     const heightmap: number[][] = [];
@@ -124,46 +128,111 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     return newHeightmap;
   };
 
+  const floodFillOcean = (heightmap: number[][]): boolean[][] => {
+    const size = canvasSize;
+    const ocean = Array(size).fill(null).map(() => Array(size).fill(false));
+    const queue = [{ x: size - 1, y: 0 }]; // Start from the top-right corner
   
-
-  const generateMesh = (heightmap: number[][]) => {
-    const geometry = new THREE.PlaneGeometry(
-      canvasSize,
-      canvasSize,
-      canvasSize - 1,
-      canvasSize - 1
-    );
-
-    let colors = [];
-
-    for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
-      const x = Math.floor((i / 3) % canvasSize);
-      const y = Math.floor(i / 3 / canvasSize);
-
-      // Set the Z value (height) from the heightmap
-      geometry.attributes.position.setZ(i / 3, heightmap[x][y] * 10); // Adjust multiplier for height scaling
-
-      let color;
-      if (heightmap[x][y] < 0.001) {
-        color = new THREE.Color(0x0000ff);
-      } else {
-        color = new THREE.Color((8 * heightmap[x][y]), 50 + (8 * heightmap[x][y]), (8 * heightmap[x][y]));
+    while (queue.length > 0) {
+      const { x, y } = queue.shift()!;
+      if (ocean[x][y] || heightmap[x][y] > 0.001) continue;
+  
+      ocean[x][y] = true;
+  
+      // Check the 4-connected neighbors (up, down, left, right)
+      const neighbors = [
+        { x: x - 1, y }, { x: x + 1, y },
+        { x, y: y - 1 }, { x, y: y + 1 }
+      ];
+  
+      for (const neighbor of neighbors) {
+        if (neighbor.x >= 0 && neighbor.x < size && neighbor.y >= 0 && neighbor.y < size) {
+          queue.push(neighbor);
+        }
       }
-
-      colors.push(color.r, color.g, color.b);
     }
+  
+    return ocean;
+  };
 
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
+  // Section for town generation
 
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      flatShading: true,
-    });
+  const getRandomInt = (min: number, max: number): number => {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  };
 
-    const retMesh = new THREE.Mesh(geometry, material);
+  const getRandomLandTile = (heightmap: number[][]): { x: number; y: number } => {
+    const size = heightmap.length;
+    const landTiles: Array<{ x: number; y: number }> = [];
+  
+    // Gather all land tiles (tiles that are not underwater)
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        if (heightmap[x][y] > threshold) {
+          landTiles.push({ x, y });
+        }
+      }
+    }
+  
+    // If there are no land tiles, return null or handle the edge case
+    if (landTiles.length === 0) {
+      throw new Error("No land tiles available to place the town square.");
+    }
+  
+    // Pick a random land tile
+    const randomIndex = getRandomInt(0, landTiles.length - 1);
 
-    return retMesh;
+    const townSquareTile = landTiles[randomIndex];
+
+    console.log(townSquareTile);
+    console.log(heightmap[townSquareTile.x][townSquareTile.y]);
+
+    return townSquareTile;
+  };
+
+  const findHighestPoint = (heightmap: number[][], center: { x: number; y: number }, minRadius: number, maxRadius: number): { x: number; y: number } => {
+    const size = heightmap.length;
+    let highestPoint = center;
+    let maxHeight = heightmap[center.x][center.y];
+  
+    for (let dx = -maxRadius; dx <= maxRadius; dx++) {
+      if (dx > -minRadius && dx < minRadius) continue;
+      for (let dy = -maxRadius; dy <= maxRadius; dy++) {
+        if (dy > -minRadius && dy < minRadius) continue;
+        const x = center.x + dx;
+        const y = center.y + dy;
+        if (x >= 0 && y >= 0 && x < size && y < size) {
+          if (heightmap[x][y] > maxHeight) {
+            maxHeight = heightmap[x][y];
+            highestPoint = { x, y };
+          }
+        }
+      }
+    }
+  
+    return highestPoint;
+  };
+
+  const findClosestWaterBorder = (heightmap: number[][], center: { x: number; y: number }): { x: number; y: number } => {
+    const oceanTiles = floodFillOcean(heightmap);
+    
+    const size = heightmap.length;
+    let closestPoint = null;
+    let minDistance = Infinity;
+  
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        if (oceanTiles[x][y]) {
+          const distance = Math.abs(x - center.x) + Math.abs(y - center.y); // Manhattan distance
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestPoint = { x, y };
+          }
+        }
+      }
+    }
+  
+    return closestPoint!;
   };
 
 
@@ -172,9 +241,12 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
 
     const heightmap = generateHeightmap(p5Instance);
     const blurredHeightmap = blurHeightmap(heightmap);
-    const newMesh = generateMesh(blurredHeightmap);
   
-    props.onMeshGenerated(newMesh);
+    const townSquarePosition = getRandomLandTile(blurredHeightmap);
+    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS);
+    const docksPosition = findClosestWaterBorder(blurredHeightmap, townSquarePosition);
+
+    props.onWorldGenerated({heightmap: blurredHeightmap, townSquare: townSquarePosition, temple: templePosition, docks: docksPosition});
   };
 
   return (
