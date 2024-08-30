@@ -6,7 +6,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
+import { MESH_THICKNESS } from '@/constants';
 import { World } from '@/types';
+
+const DEBUG_DRAW_TOWN_LOCATIONS = true;
 
 export interface ThreeSceneProps {
   world: World | null;
@@ -98,7 +101,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     mountRef.current.appendChild(renderer.domElement);
     sceneRef.current = scene;
 
-    camera.position.set(0, 50, 100);
+    camera.position.set(0, 0, 100);
     cameraRef.current = camera;
 
     // Lighting
@@ -132,59 +135,127 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
+  
   useEffect(() => {
     if (!props.world) return;
     if (props.world.heightmap && sceneRef.current) {
       const mesh = generateMesh(props.world.heightmap);
       meshRef.current = mesh;
+
+      const drawTownLocations = () => {
+        if (!props.world || !sceneRef.current) return;
+        
+        const townSquarePosition = new THREE.Vector3(
+          props.world.townSquare.x - mesh.geometry.parameters.width / 2,
+          (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
+          props.world.heightmap[props.world.townSquare.x][(props.world.heightmap.length - props.world.townSquare.y)] * MESH_THICKNESS
+        );
+    
+        const docksPosition = new THREE.Vector3(
+          props.world.docks.x - mesh.geometry.parameters.width / 2,
+          (props.world.heightmap.length - props.world.docks.y) - mesh.geometry.parameters.height / 2,
+          props.world.heightmap[props.world.docks.x][(props.world.heightmap.length - props.world.docks.y)] * MESH_THICKNESS
+        );
+    
+        const templePosition = new THREE.Vector3(
+          props.world.temple.x - mesh.geometry.parameters.width / 2,
+          (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
+          props.world.heightmap[props.world.temple.x][(props.world.heightmap.length - props.world.temple.y)] * MESH_THICKNESS
+        );
+    
+        const townSquareTop = new THREE.Vector3(
+          townSquarePosition.x,
+          townSquarePosition.y,
+          townSquarePosition.z + 10
+        );
+    
+        const docksTop = new THREE.Vector3(
+          docksPosition.x,
+          docksPosition.y,
+          docksPosition.z + 10
+        );
+    
+        const templeTop = new THREE.Vector3(
+          templePosition.x,
+          templePosition.y,
+          templePosition.z + 10
+        );
+    
+        const townSquareLine = createThickLine(townSquarePosition, townSquareTop, 0xff00ff);
+        const docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
+        const templeLine = createThickLine(templePosition, templeTop, 0xffff00);
+        
+        sceneRef.current.add(townSquareLine);
+        sceneRef.current.add(docksLine);
+        sceneRef.current.add(templeLine);
+      };
+
+      const drawTemple = () => {
+        const normalizer = 10;
+        if (!props.world || !sceneRef.current) return;
+
+        const templePosition = new THREE.Vector3(
+          props.world.temple.x - mesh.geometry.parameters.width / 2,
+          (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
+          props.world.heightmap[props.world.temple.x][props.world.temple.y] * MESH_THICKNESS
+        );
+
+        console.log(props.world.heightmap[props.world.temple.x][props.world.temple.y]);
+
+        const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
+
+        // Create the Platform (elevated box)
+        const platformGeometry = new THREE.CylinderGeometry(15 / normalizer, 13 / normalizer, 2 / normalizer, 32);
+        const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
+        platform.position.set(templePosition.x, templePosition.y, templePosition.z);
+        platform.rotation.x = -Math.PI / 2;
+        sceneRef.current.add(platform);
+
+        // Create a Column
+        const columnGeometry = new THREE.CylinderGeometry(0.5 / normalizer, 0.5 / normalizer, 10 / normalizer, 32);
+
+        // Position Columns around the Platform
+        const columnCount = 12; // Number of columns
+        const radius = 12 / normalizer; // Radius from the center to place the columns
+
+        for (let i = 0; i < columnCount; i++) {
+            const angle = (i / columnCount) * 2 * Math.PI;
+            const x = radius * Math.cos(angle) + templePosition.x;
+            const y = radius * Math.sin(angle) + templePosition.y;
+
+            const column = new THREE.Mesh(columnGeometry, marbleMaterial);
+            column.position.set(x, y, templePosition.z + 5 / normalizer); // 5 is half the height of the column
+            column.rotation.x = -Math.PI / 2;
+            sceneRef.current.add(column);
+        }
+      }
+
+      const drawTownSquare = () => {
+        if (!props.world || !sceneRef.current) return;
+        const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
+
+        const townSquarePosition = new THREE.Vector3(
+          props.world.townSquare.x - mesh.geometry.parameters.width / 2,
+          (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
+          props.world.heightmap[props.world.townSquare.x][props.world.townSquare.y] * MESH_THICKNESS
+        );
+
+        const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
+        const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
+        platform.position.set(townSquarePosition.x, townSquarePosition.y, townSquarePosition.z); // Raise the platform above ground level
+        sceneRef.current.add(platform);
+      }
+    
       
       console.log(mesh);
       sceneRef.current.clear(); // Clear previous mesh
       sceneRef.current.add(mesh); // Add the new mesh
 
-      const townSquarePosition = new THREE.Vector3(
-        props.world.townSquare.x - mesh.geometry.parameters.width / 2,
-        (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
-        props.world.heightmap[props.world.townSquare.x][(props.world.heightmap.length - props.world.townSquare.y)] 
-      );
+      if (DEBUG_DRAW_TOWN_LOCATIONS) drawTownLocations();
 
-      const docksPosition = new THREE.Vector3(
-        props.world.docks.x - mesh.geometry.parameters.width / 2,
-        (props.world.heightmap.length - props.world.docks.y) - mesh.geometry.parameters.height / 2,
-        props.world.heightmap[props.world.docks.x][(props.world.heightmap.length - props.world.docks.y)]
-      );
-
-      const templePosition = new THREE.Vector3(
-        props.world.temple.x - mesh.geometry.parameters.width / 2,
-        (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
-        props.world.heightmap[props.world.temple.x][(props.world.heightmap.length - props.world.temple.y)]
-      );
-
-      const townSquareTop = new THREE.Vector3(
-        townSquarePosition.x,
-        townSquarePosition.y,
-        townSquarePosition.z + 10
-      );
-
-      const docksTop = new THREE.Vector3(
-        docksPosition.x,
-        docksPosition.y,
-        docksPosition.z + 10
-      );
-
-      const templeTop = new THREE.Vector3(
-        templePosition.x,
-        templePosition.y,
-        templePosition.z + 10
-      );
-
-      const townSquareLine = createThickLine(townSquarePosition, townSquareTop, 0xff00ff);
-      const docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
-      const templeLine = createThickLine(templePosition, templeTop, 0xffff00);
+      drawTemple();
+      drawTownSquare();
       
-      sceneRef.current.add(townSquareLine);
-      sceneRef.current.add(docksLine);
-      sceneRef.current.add(templeLine);
 
       if (ambientLightRef.current) {
         sceneRef.current.add(ambientLightRef.current);
@@ -196,21 +267,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     }
   }, [props.world]);
 
-  // Adjust the camera's field of view (FOV) for zooming
-  const handleZoomIn = () => {
-    if (cameraRef.current) {
-      cameraRef.current.fov = Math.max(cameraRef.current.fov - 5, 10); // Minimum FOV of 10
-      cameraRef.current.updateProjectionMatrix();
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (cameraRef.current) {
-      cameraRef.current.fov = Math.min(cameraRef.current.fov + 5, 100); // Maximum FOV of 100
-      cameraRef.current.updateProjectionMatrix();
-    }
-  };
-
   const handleResetView = () => {
     if (cameraRef.current && controlsRef.current) {
       cameraRef.current.position.set(0, 50, 100);
@@ -220,20 +276,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     }
   };
 
-  const handleCoordinatesClick = () => {
-    if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(100, 100, 100);
-      controlsRef.current.reset();
-    }
-  };
-
   // Function to move the camera directly above the town square
   const moveCameraAboveTownSquare = () => {
     if (!cameraRef.current || !controlsRef.current || !props.world || !meshRef.current) return;
 
     const townSquarePosition = new THREE.Vector3(
-      props.world!.townSquare.x - meshRef.current!.geometry.parameters.width / 2,
-      (props.world.heightmap.length - props.world!.townSquare.y) - meshRef.current!.geometry.parameters.height / 2,
+      props.world!.townSquare.x - (meshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
+      (props.world.heightmap.length - props.world!.townSquare.y) - (meshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
       10 // Z position above the ground
     );
     cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
@@ -246,32 +295,34 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     if (typeof window !== 'undefined') {
 
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (!cameraRef.current) return;
+        if (!cameraRef.current || !controlsRef.current) return;
 
-        const moveSpeed = 2;
-        const direction = new THREE.Vector3();
-        cameraRef.current.getWorldDirection(direction);
+        const moveSpeed = 10;
 
         switch (event.key) {
           case 'w':
-            cameraRef.current.position.addScaledVector(direction, moveSpeed);
+            let north = new THREE.Vector3(0, 1, 0);
+            controlsRef.current.target.addScaledVector(north, moveSpeed);
+            cameraRef.current.position.addScaledVector(north, moveSpeed);
             break;
           case 's':
-            cameraRef.current.position.addScaledVector(direction, -moveSpeed);
+            let south = new THREE.Vector3(0, -1, 0);
+            controlsRef.current.target.addScaledVector(south, moveSpeed);
+            cameraRef.current.position.addScaledVector(south, moveSpeed);
             break;
           case 'a':
-            const rightVector = new THREE.Vector3();
-            cameraRef.current.getWorldDirection(direction);
-            rightVector.crossVectors(cameraRef.current.up, direction).normalize();
-            cameraRef.current.position.addScaledVector(rightVector, -moveSpeed);
+            let west = new THREE.Vector3(-1, 0, 0);
+            controlsRef.current.target.addScaledVector(west, moveSpeed);
+            cameraRef.current.position.addScaledVector(west, moveSpeed);
             break;
           case 'd':
-            const leftVector = new THREE.Vector3();
-            cameraRef.current.getWorldDirection(direction);
-            leftVector.crossVectors(cameraRef.current.up, direction).normalize();
-            cameraRef.current.position.addScaledVector(leftVector, moveSpeed);
+            let east = new THREE.Vector3(1, 0, 0);
+            controlsRef.current.target.addScaledVector(east, moveSpeed);
+            cameraRef.current.position.addScaledVector(east, moveSpeed);
             break;
         }
+
+        controlsRef.current.update();
       };
 
       window.addEventListener('keydown', handleKeyDown);

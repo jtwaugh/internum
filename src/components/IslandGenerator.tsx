@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import p5 from 'p5';
 
-import { TEMPLE_RADIUS } from '@/constants';
+import { TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS, MESH_THICKNESS } from '@/constants';
 import { Slider } from '@/components/ui/slider';
 import { Button } from './ui/button';
 
@@ -190,13 +190,15 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     return townSquareTile;
   };
 
-  const findHighestPoint = (heightmap: number[][], center: { x: number; y: number }, radius: number): { x: number; y: number } => {
+  const findHighestPoint = (heightmap: number[][], center: { x: number; y: number }, minRadius: number, maxRadius: number): { x: number; y: number } => {
     const size = heightmap.length;
     let highestPoint = center;
     let maxHeight = heightmap[center.x][center.y];
   
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -maxRadius; dx <= maxRadius; dx++) {
+      if (dx > -minRadius && dx < minRadius) continue;
+      for (let dy = -maxRadius; dy <= maxRadius; dy++) {
+        if (dy > -minRadius && dy < minRadius) continue;
         const x = center.x + dx;
         const y = center.y + dy;
         if (x >= 0 && y >= 0 && x < size && y < size) {
@@ -241,7 +243,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     const blurredHeightmap = blurHeightmap(heightmap);
   
     const townSquarePosition = getRandomLandTile(blurredHeightmap);
-    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, TEMPLE_RADIUS);
+    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS);
     const docksPosition = findClosestWaterBorder(blurredHeightmap, townSquarePosition);
 
     props.onWorldGenerated({heightmap: blurredHeightmap, townSquare: townSquarePosition, temple: templePosition, docks: docksPosition});
