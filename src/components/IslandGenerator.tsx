@@ -3,18 +3,23 @@
 import React, { useState } from 'react';
 import p5 from 'p5';
 
-import { TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS, MESH_THICKNESS } from '@/constants';
+import { TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS } from '@/constants';
+
 import { Slider } from '@/components/ui/slider';
 import { Button } from './ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 
 import { World } from '@/types';
 
+
 interface IslandGeneratorProps {
   onWorldGenerated: (world: World | null) => void;
+  display: boolean;
 }
 
 const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorProps) => {
-  // const canvasRef = useRef<HTMLDivElement>(null);
   const [noiseScale, setNoiseScale] = useState(0.1);
   const [canvasSize, setCanvasSize] = useState(400);
   const [threshold, setThreshold] = useState(0.5);
@@ -249,78 +254,114 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     props.onWorldGenerated({heightmap: blurredHeightmap, townSquare: townSquarePosition, temple: templePosition, docks: docksPosition});
   };
 
+  if (!props.display) {
+    return <></>;
+  }
+
   return (
     <div>
-      <div>
-        <label>
-          <span className='p-2 font-bold text-xs'>Noise Scale: {noiseScale}</span>
-          <Slider
-            className='w-1/6 p-2'
-            min={0.01}
-            max={0.3}
-            step={0.01}
-            value={[noiseScale]}
-            onValueChange={(values) => setNoiseScale(values[0])}
-          />
-        </label>
+      <div className='p-4 flex justify-center'>
+        <Label className='text-4xl font-extrabold'>Demiurge Studio</Label>
       </div>
-      <div>
-        <label>
-        <span className='p-2 font-bold text-xs'>Canvas Size: {canvasSize}</span>
-          <Slider
-            className='w-1/6 p-2'
-            min={200}
-            max={800}
-            step={50}
-            value={[canvasSize]}
-            onValueChange={(values) => setCanvasSize(values[0])}
-          />
-        </label>
+      
+      <div className="flex bg-primary border-input">
+        <div className="flex w-1/2 p-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">Worldgen Parameters</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div>
+                <label>
+                  <span className='p-2 font-bold text-xs'>Noise Scale: {noiseScale}</span>
+                  <Slider
+                    className='p-2'
+                    min={0.01}
+                    max={0.3}
+                    step={0.01}
+                    value={[noiseScale]}
+                    onValueChange={(values) => setNoiseScale(values[0])}
+                  />
+                </label>
+              </div>
+              <div>
+                <label>
+                  <span className='p-2 font-bold text-xs'>Canvas Size: {canvasSize}</span>
+                    <Slider
+                      className='p-2'
+                      min={200}
+                      max={800}
+                      step={50}
+                      value={[canvasSize]}
+                      onValueChange={(values) => setCanvasSize(values[0])}
+                    />
+                </label>
+              </div>
+              <div>
+                <label>
+                <span className='p-2 font-bold text-xs'>Max Distance Factor: {maxDistanceFactor}</span>
+                  <Slider
+                    className='p-2'
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={[maxDistanceFactor]}
+                    onValueChange={(values) => setMaxDistanceFactor(values[0])}
+                  />
+                </label>
+              </div>
+              <div>
+                <label>
+                <span className='p-2 font-bold text-xs'>Threshold: {threshold}</span>
+                  <Slider
+                    className='p-2'
+                    min={0.0}
+                    max={1.0}
+                    step={0.05}
+                    value={[threshold]}
+                    onValueChange={(values) => setThreshold(values[0])}
+                  />
+                </label>
+              </div>
+              <div>
+                <label>
+                <span className='p-2 font-bold text-xs'>Blur Iterations: {blurIterations}</span>
+                  <Slider
+                    className='p-2'
+                    min={0.0}
+                    max={10.0}
+                    step={1.0}
+                    value={[blurIterations]}
+                    onValueChange={(values) => {
+                      setBlurIterations(values[0]);
+                    }
+                      }
+                  />
+                </label>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="flex w-1/2 p-4 justify-end">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">Color Parameters</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div>
+                <label>
+                  <span className='p-2 font-bold text-xs'>asdf </span>
+                </label>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
-      <div>
-        <label>
-        <span className='p-2 font-bold text-xs'>Max Distance Factor: {maxDistanceFactor}</span>
-          <Slider
-            className='w-1/6 p-2'
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={[maxDistanceFactor]}
-            onValueChange={(values) => setMaxDistanceFactor(values[0])}
-          />
-        </label>
+      
+      <div className="flex p-4 justify-center">
+        <Button className='pt-6 pb-6' style={{backgroundColor: "#0000aa"}} onClick={handleGenerate}><div className='text-2xl font-extrabold'>Generate</div></Button>
       </div>
-      <div>
-        <label>
-        <span className='p-2 font-bold text-xs'>Threshold: {threshold}</span>
-          <Slider
-            className='w-1/6 p-2'
-            min={0.0}
-            max={1.0}
-            step={0.05}
-            value={[threshold]}
-            onValueChange={(values) => setThreshold(values[0])}
-          />
-        </label>
-      </div>
-      <div>
-        <label>
-        <span className='p-2 font-bold text-xs'>Blur Iterations: {blurIterations}</span>
-          <Slider
-            className='w-1/6 p-2'
-            min={0.0}
-            max={10.0}
-            step={1.0}
-            value={[blurIterations]}
-            onValueChange={(values) => {
-              setBlurIterations(values[0]);
-            }
-              }
-          />
-        </label>
-      </div>
-      <Button onClick={handleGenerate}>Generate</Button>
-      {/* <div ref={canvasRef}></div> */}
+    
     </div>
   );
 };

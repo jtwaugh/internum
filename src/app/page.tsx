@@ -17,8 +17,11 @@ import { useState, useEffect } from "react";
 
 import { World } from '@/types';
 
+
+
 export default function Home() {
   const [currentWorld, setCurrentWorld] = useState<World | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   useEffect(() => {
     //console.log(currentMesh);
@@ -26,8 +29,8 @@ export default function Home() {
 
   return (
     <div>
-      <IslandGenerator onWorldGenerated={setCurrentWorld} />
-      <ThreeScene world={currentWorld}/>
+      <IslandGenerator onWorldGenerated={setCurrentWorld} display={!isFullscreen} />
+      <ThreeScene world={currentWorld} handleFullscreenChange={setIsFullscreen}/>
     </div>
   );
 }
