@@ -6,13 +6,19 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
-import { MESH_THICKNESS } from '@/constants';
 import { World } from '@/types';
+import { drawTemple, drawTownLocations, drawTownSquare } from '@/app/models';
 
 const DEBUG_DRAW_TOWN_LOCATIONS = true;
 
 export interface ThreeSceneProps {
   world: World | null;
+}
+
+enum CameraMode {
+  FreeFloat,
+  FreeFall,
+  Walking
 }
 
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
@@ -23,6 +29,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const cameraMode = useRef<CameraMode>(CameraMode.FreeFloat);
 
   const generateMesh = (heightmap: number[][]) => {
     const canvasSize = heightmap.length;
@@ -69,25 +76,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     const retMesh = new THREE.Mesh(geometry, material);
 
     return retMesh;
-  };
-
-  const createThickLine = (start: THREE.Vector3, end: THREE.Vector3, color: number): THREE.Mesh => {
-    const height = start.distanceTo(end);
-    const geometry = new THREE.CylinderGeometry(0.5, 0.5, height, 32); // Adjust the radius for thickness
-    const material = new THREE.MeshBasicMaterial({ color });
-    const cylinder = new THREE.Mesh(geometry, material);
-  
-    // Position the cylinder between start and end
-    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-    cylinder.position.copy(midpoint);
-  
-    // Orient the cylinder to align with the start and end points
-    const direction = new THREE.Vector3().subVectors(end, start).normalize();
-    const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
-    const angle = Math.acos(new THREE.Vector3(0, 1, 0).dot(direction));
-    cylinder.quaternion.setFromAxisAngle(axis, angle);
-  
-    return cylinder;
   };
 
   useEffect(() => {
@@ -141,120 +129,28 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     if (props.world.heightmap && sceneRef.current) {
       const mesh = generateMesh(props.world.heightmap);
       meshRef.current = mesh;
-
-      const drawTownLocations = () => {
-        if (!props.world || !sceneRef.current) return;
-        
-        const townSquarePosition = new THREE.Vector3(
-          props.world.townSquare.x - mesh.geometry.parameters.width / 2,
-          (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
-          props.world.heightmap[props.world.townSquare.x][(props.world.heightmap.length - props.world.townSquare.y)] * MESH_THICKNESS
-        );
-    
-        const docksPosition = new THREE.Vector3(
-          props.world.docks.x - mesh.geometry.parameters.width / 2,
-          (props.world.heightmap.length - props.world.docks.y) - mesh.geometry.parameters.height / 2,
-          props.world.heightmap[props.world.docks.x][(props.world.heightmap.length - props.world.docks.y)] * MESH_THICKNESS
-        );
-    
-        const templePosition = new THREE.Vector3(
-          props.world.temple.x - mesh.geometry.parameters.width / 2,
-          (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
-          props.world.heightmap[props.world.temple.x][(props.world.heightmap.length - props.world.temple.y)] * MESH_THICKNESS
-        );
-    
-        const townSquareTop = new THREE.Vector3(
-          townSquarePosition.x,
-          townSquarePosition.y,
-          townSquarePosition.z + 10
-        );
-    
-        const docksTop = new THREE.Vector3(
-          docksPosition.x,
-          docksPosition.y,
-          docksPosition.z + 10
-        );
-    
-        const templeTop = new THREE.Vector3(
-          templePosition.x,
-          templePosition.y,
-          templePosition.z + 10
-        );
-    
-        const townSquareLine = createThickLine(townSquarePosition, townSquareTop, 0xff00ff);
-        const docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
-        const templeLine = createThickLine(templePosition, templeTop, 0xffff00);
-        
-        sceneRef.current.add(townSquareLine);
-        sceneRef.current.add(docksLine);
-        sceneRef.current.add(templeLine);
-      };
-
-      const drawTemple = () => {
-        const normalizer = 10;
-        if (!props.world || !sceneRef.current) return;
-
-        const templePosition = new THREE.Vector3(
-          props.world.temple.x - mesh.geometry.parameters.width / 2,
-          (props.world.heightmap.length - props.world.temple.y) - mesh.geometry.parameters.height / 2,
-          props.world.heightmap[props.world.temple.x][props.world.temple.y] * MESH_THICKNESS
-        );
-
-        console.log(props.world.heightmap[props.world.temple.x][props.world.temple.y]);
-
-        const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
-
-        // Create the Platform (elevated box)
-        const platformGeometry = new THREE.CylinderGeometry(15 / normalizer, 13 / normalizer, 2 / normalizer, 32);
-        const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
-        platform.position.set(templePosition.x, templePosition.y, templePosition.z);
-        platform.rotation.x = -Math.PI / 2;
-        sceneRef.current.add(platform);
-
-        // Create a Column
-        const columnGeometry = new THREE.CylinderGeometry(0.5 / normalizer, 0.5 / normalizer, 10 / normalizer, 32);
-
-        // Position Columns around the Platform
-        const columnCount = 12; // Number of columns
-        const radius = 12 / normalizer; // Radius from the center to place the columns
-
-        for (let i = 0; i < columnCount; i++) {
-            const angle = (i / columnCount) * 2 * Math.PI;
-            const x = radius * Math.cos(angle) + templePosition.x;
-            const y = radius * Math.sin(angle) + templePosition.y;
-
-            const column = new THREE.Mesh(columnGeometry, marbleMaterial);
-            column.position.set(x, y, templePosition.z + 5 / normalizer); // 5 is half the height of the column
-            column.rotation.x = -Math.PI / 2;
-            sceneRef.current.add(column);
-        }
-      }
-
-      const drawTownSquare = () => {
-        if (!props.world || !sceneRef.current) return;
-        const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
-
-        const townSquarePosition = new THREE.Vector3(
-          props.world.townSquare.x - mesh.geometry.parameters.width / 2,
-          (props.world.heightmap.length - props.world.townSquare.y) - mesh.geometry.parameters.height / 2,
-          props.world.heightmap[props.world.townSquare.x][props.world.townSquare.y] * MESH_THICKNESS
-        );
-
-        const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
-        const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
-        platform.position.set(townSquarePosition.x, townSquarePosition.y, townSquarePosition.z); // Raise the platform above ground level
-        sceneRef.current.add(platform);
-      }
-    
       
-      console.log(mesh);
-      sceneRef.current.clear(); // Clear previous mesh
-      sceneRef.current.add(mesh); // Add the new mesh
+      sceneRef.current.clear();
 
-      if (DEBUG_DRAW_TOWN_LOCATIONS) drawTownLocations();
 
-      drawTemple();
-      drawTownSquare();
+      sceneRef.current.add(mesh);
+
+      if (DEBUG_DRAW_TOWN_LOCATIONS) {
+        const [townSquare, temple, docks] = drawTownLocations(props.world, mesh);
+        sceneRef.current.add(townSquare);
+        sceneRef.current.add(temple);
+        sceneRef.current.add(docks);
+      }
+
+      const [platform, columns] = drawTemple(props.world, mesh, 12);
+      sceneRef.current.add(platform);
+      columns.forEach(column => {
+        sceneRef.current!.add(column);  
+      });
+      
+    
+      const townSquarePlatform = drawTownSquare(props.world, mesh);
+      sceneRef.current.add(townSquarePlatform);
       
 
       if (ambientLightRef.current) {
