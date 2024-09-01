@@ -1,8 +1,5 @@
 "use client"
 
-// import ThreeScene from "../components/ThreeScene";
-// import IslandGenerator from "../components/IslandGenerator";
-import * as THREE from 'three';
 
 import dynamic from 'next/dynamic';
 
@@ -16,8 +13,6 @@ const IslandGenerator = dynamic(() => import('../components/IslandGenerator'), {
 import { useState, useEffect } from "react";
 
 import { World } from '@/types';
-
-
 
 export default function Home() {
   const [currentWorld, setCurrentWorld] = useState<World | null>(null);
