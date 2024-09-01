@@ -274,7 +274,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
   }
 
   return (
-    <div>
+    <div id='island-generator-container' tabIndex={1}>
       <div className='p-4 flex justify-center'>
         <Label className='text-4xl font-extrabold'>Demiurge Studio</Label>
       </div>
@@ -376,7 +376,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
                     </div>
                     <div className='w-1/2 flex justify-end'>
                       <div className='aspect-square border rounded-md' style={{
-                          background: `linear-gradient(180deg, ${gradient[2]}, ${gradient[1]}, ${gradient[0]})`,
+                          background: `linear-gradient(180deg, ${gradient[3]}, ${gradient[2]}, ${gradient[1]}, ${gradient[0]})`,
                         }}/>
                     </div>
                   </div>

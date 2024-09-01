@@ -173,8 +173,10 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
       let color;
       if (world.heightmap[x][y] < 0.001) {
         color = new THREE.Color(colorsConfig.terrainGradient[0]);
+      } else if (world.heightmap[x][y] < 0.5) {
+        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * 2));
       } else {
-        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y]));
+        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.5) * 2));
       }
 
       // DEBUG

@@ -16,6 +16,12 @@ import { DEFAULT_AMBIENT_LIGHT_COLOR, DEFAULT_DIRECTIONAL_LIGHT_COLOR, DEFAULT_G
 
 import { ColorsConfig, World } from '@/types';
 
+const handleGlobalKeyDown = (event: any) => {
+  if (document.activeElement!.id !== 'three-scene') {
+    event.stopPropagation(); // Stops key events from propagating when not focused
+  }
+};
+
 export default function Home() {
   const [currentWorld, setCurrentWorld] = useState<World | null>(null);
   const [currentColors, setCurrentColors] = useState<ColorsConfig>({terrainGradient: DEFAULT_GRADIENT, ambientLight: DEFAULT_AMBIENT_LIGHT_COLOR, directionalLight: DEFAULT_DIRECTIONAL_LIGHT_COLOR});

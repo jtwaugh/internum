@@ -34,6 +34,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const fullscreenButton = document.getElementById('fullscreen-btn');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Props
   const colorConfigRef = useRef(props.colorsConfig);
@@ -93,7 +94,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     scene.add(ambientLight);
     ambientLightRef.current = ambientLight;
 
-    const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight, 1);
+    const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight, 100);
     directionalLight.position.set(50, 50, 50);
     scene.add(directionalLight);
     directionalLightRef.current = directionalLight;
@@ -145,7 +146,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       freeFloatControlsRef.current!.update();
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    const handleBlur = () => {
+      console.log('ThreeScene lost focus, stopping key listeners');
+      containerRef.current.removeEventListener('keydown', handleKeyDown);
+    };
+
+    const handleFocus = () => {
+      console.log('ThreeScene gained focus, adding key listeners');
+      containerRef.current.addEventListener('keydown', handleKeyDown);
+    };
 
     // Game logic: Initialize to free-float mode
     controlsRef.current = orbitControls;
@@ -300,10 +309,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }
 
   return (
-    <div className='p-4'>
+    <div ref={containerRef} id='three-container' tabIndex={0} className='p-4'>
       <div className='flex h-full justify-center'>
         <div>
-        <div id="container" className="relative">
+        <div id="fullscreen-button-container" className="relative">
             <Button id="fullscreen-btn" onClick={onFullscreenClick} className="absolute top-1 right-2 z-10 px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70">
             『』
             </Button>
@@ -311,7 +320,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
           <div ref={mountRef} />
 
-          <div id="container" className="relative">
+          <div id="buttons-container" className="relative">
             <div className='flex p-4'>
               <div className='flex w-1/3'>
                 <Button 
