@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { World } from '@/types';
+import { ColorsConfig, World } from '@/types';
 import { MESH_THICKNESS } from '@/constants';
 
 
@@ -123,7 +123,35 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
     return platform;
   }
 
- export const generateMesh = (world: World) => {
+  const interpolateColor = (color1: string, color2: string, factor: number): string => {
+    // Clamp factor between 0 and 1
+    factor = Math.min(Math.max(factor, 0), 1);
+
+    // Parse the colors into their RGB components
+    const c1 = parseInt(color1.substring(1), 16);
+    const c2 = parseInt(color2.substring(1), 16);
+
+    const r1 = (c1 >> 16) & 0xff;
+    const g1 = (c1 >> 8) & 0xff;
+    const b1 = c1 & 0xff;
+
+    const r2 = (c2 >> 16) & 0xff;
+    const g2 = (c2 >> 8) & 0xff;
+    const b2 = c2 & 0xff;
+
+    // Interpolate each color component
+    const r = Math.round(r1 + factor * (r2 - r1));
+    const g = Math.round(g1 + factor * (g2 - g1));
+    const b = Math.round(b1 + factor * (b2 - b1));
+
+    // Convert the interpolated RGB values back to a hex string
+    const rgb = (r << 16) | (g << 8) | b;
+    return `#${rgb.toString(16).padStart(6, '0')}`;
+}
+
+ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
+    console.log(colorsConfig);
+
     const canvasSize = world.heightmap.length;
 
     const geometry = new THREE.PlaneGeometry(
@@ -144,9 +172,9 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
 
       let color;
       if (world.heightmap[x][y] < 0.001) {
-        color = new THREE.Color(0x0000ff);
+        color = new THREE.Color(colorsConfig.terrainGradient[0]);
       } else {
-        color = new THREE.Color((8 * world.heightmap[x][y]), 50 + (8 * world.heightmap[x][y]), (8 * world.heightmap[x][y]));
+        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y]));
       }
 
       // DEBUG

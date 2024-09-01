@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls, PointerLockControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
-import { World } from '@/types';
+import { ColorsConfig, World } from '@/types';
 import { drawTemple, drawTownLocations, drawTownSquare, generateMesh } from '@/app/models';
 
 const DEBUG_DRAW_TOWN_LOCATIONS = true;
@@ -16,11 +16,9 @@ const DEFAULT_ASPECT = 1.5;
 const DEFAULT_NEAR = 0.1;
 const DEFAULT_FAR = 1000;
 
-const DEFAULT_AMBIENT_LIGHT_COLOR = 0x404040;
-const DEFAULT_DIRECTIONAL_LIGHT_COLOR = 0xffffff;
-
 export interface ThreeSceneProps {
   world: World | null;
+  colorsConfig: ColorsConfig;
   handleFullscreenChange: Function;
 }
 
@@ -37,10 +35,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const fullscreenButton = document.getElementById('fullscreen-btn');
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // Props
+  const colorConfigRef = useRef(props.colorsConfig);
+
   // Actual scene objects
   const sceneRef = useRef<THREE.Scene | null>(null);
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
-  const lightRef = useRef<THREE.DirectionalLight | null>(null);
+  const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
 
   // Clock
   const clockRef = useRef<THREE.Clock | null>(null); 
@@ -71,6 +72,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const fallSpeedRef = useRef(0); // Use ref to persist fall speed across renders
   const gravity = 9.81; // Simulating gravity
 
+  useEffect(() => {
+    colorConfigRef.current = props.colorsConfig;
+    console.log(props.colorsConfig);
+  }, [props.colorsConfig]);
+
 
   useEffect(() => {
     // Constructor: Components setup
@@ -83,14 +89,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     // Constructor: Scene setup
     const scene = new THREE.Scene();
 
-    const ambientLight = new THREE.AmbientLight(DEFAULT_AMBIENT_LIGHT_COLOR); // Soft ambient light
+    const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
     scene.add(ambientLight);
     ambientLightRef.current = ambientLight;
 
-    const directionalLight = new THREE.DirectionalLight(DEFAULT_DIRECTIONAL_LIGHT_COLOR, 1);
+    const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight, 1);
     directionalLight.position.set(50, 50, 50);
     scene.add(directionalLight);
-    lightRef.current = directionalLight;
+    directionalLightRef.current = directionalLight;
 
     sceneRef.current = scene;
 
@@ -153,6 +159,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
+    ambientLightRef.current = ambientLight;
+  }, [props.colorsConfig.ambientLight]);
+
+  useEffect(() => {
+    const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight); // Soft ambient light
+    directionalLightRef.current = directionalLight;
+  }, [props.colorsConfig.directionalLight]);
 
   useEffect(() => {
     // Clean up previous scene, renderer, etc.
@@ -174,7 +189,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     
 
     if (props.world.heightmap && sceneRef.current) {
-      const mesh = generateMesh(props.world);
+      console.log(colorConfigRef.current);
+      const mesh = generateMesh(props.world, colorConfigRef.current);
       meshRef.current = mesh;
 
       sceneRef.current.add(mesh);
@@ -201,8 +217,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         sceneRef.current.add(ambientLightRef.current);
       }
 
-      if (lightRef.current) {
-        sceneRef.current.add(lightRef.current);
+      if (directionalLightRef.current) {
+        sceneRef.current.add(directionalLightRef.current);
       }
     }
     

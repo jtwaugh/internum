@@ -5,3 +5,9 @@ export interface World {
     temple: { x: number; y: number };
     docks: { x: number; y: number };
   }
+
+export interface ColorsConfig {
+  terrainGradient: string[];
+  ambientLight: string;
+  directionalLight: string;
+}
