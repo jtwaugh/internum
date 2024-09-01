@@ -76,8 +76,6 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
       world.heightmap[world.temple.x][world.temple.y] * MESH_THICKNESS
     );
 
-    console.log(world.heightmap[world.temple.x][world.temple.y]);
-
     const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
 
     // Create the Platform (elevated box)
@@ -124,3 +122,50 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
 
     return platform;
   }
+
+ export const generateMesh = (world: World) => {
+    const canvasSize = world.heightmap.length;
+
+    const geometry = new THREE.PlaneGeometry(
+      canvasSize,
+      canvasSize,
+      canvasSize - 1,
+      canvasSize - 1
+    );
+
+    let colors = [];
+
+    for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
+      const x = Math.floor((i / 3) % canvasSize);
+      const y = Math.floor(i / 3 / canvasSize);
+
+      // Set the Z value (height) from the heightmap
+      geometry.attributes.position.setZ(i / 3, world.heightmap[x][y] * 10); // Adjust multiplier for height scaling
+
+      let color;
+      if (world.heightmap[x][y] < 0.001) {
+        color = new THREE.Color(0x0000ff);
+      } else {
+        color = new THREE.Color((8 * world.heightmap[x][y]), 50 + (8 * world.heightmap[x][y]), (8 * world.heightmap[x][y]));
+      }
+
+      // DEBUG
+      if (x === world.townSquare.x && y === world.townSquare.y) {
+        color = new THREE.Color(0xff00ff);
+      }
+
+      colors.push(color.r, color.g, color.b);
+    }
+
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      flatShading: true,
+    });
+
+    const retMesh = new THREE.Mesh(geometry, material);
+
+    return retMesh;
+  };

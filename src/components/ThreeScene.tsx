@@ -3,13 +3,18 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-import { OrbitControls } from 'three/examples/jsm/Addons.js';
+import { OrbitControls, PointerLockControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
 import { World } from '@/types';
-import { drawTemple, drawTownLocations, drawTownSquare } from '@/app/models';
+import { drawTemple, drawTownLocations, drawTownSquare, generateMesh } from '@/app/models';
 
 const DEBUG_DRAW_TOWN_LOCATIONS = true;
+
+const DEFAULT_FOV = 75;
+const DEFAULT_ASPECT = 1.5;
+const DEFAULT_NEAR = 0.1;
+const DEFAULT_FAR = 1000;
 
 export interface ThreeSceneProps {
   world: World | null;
@@ -22,75 +27,35 @@ enum CameraMode {
 }
 
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
-  const meshRef = useRef<THREE.Mesh | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const cameraMode = useRef<CameraMode>(CameraMode.FreeFloat);
 
-  const generateMesh = (heightmap: number[][]) => {
-    const canvasSize = heightmap.length;
+  const controlsRef = useRef<OrbitControls | PointerLockControls | null>(null);
+  const freeFloatControlsRef = useRef<OrbitControls | null>(null);
+  const pointerLockControlsRef = useRef<PointerLockControls | null>(null);
 
-    const geometry = new THREE.PlaneGeometry(
-      canvasSize,
-      canvasSize,
-      canvasSize - 1,
-      canvasSize - 1
-    );
+  const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
-    let colors = [];
+  const fallSpeedRef = useRef(0); // Use ref to persist fall speed across renders
+  const gravity = 9.81; // Simulating gravity
+  const clockRef = useRef<THREE.Clock | null>(null); 
 
-    for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
-      const x = Math.floor((i / 3) % canvasSize);
-      const y = Math.floor(i / 3 / canvasSize);
-
-      // Set the Z value (height) from the heightmap
-      geometry.attributes.position.setZ(i / 3, heightmap[x][y] * 10); // Adjust multiplier for height scaling
-
-      let color;
-      if (heightmap[x][y] < 0.001) {
-        color = new THREE.Color(0x0000ff);
-      } else {
-        color = new THREE.Color((8 * heightmap[x][y]), 50 + (8 * heightmap[x][y]), (8 * heightmap[x][y]));
-      }
-
-      // DEBUG
-      if (x === props.world?.townSquare.x && y === props.world?.townSquare.y) {
-        color = new THREE.Color(0xff00ff);
-      }
-
-      colors.push(color.r, color.g, color.b);
-    }
-
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
-
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      flatShading: true,
-    });
-
-    const retMesh = new THREE.Mesh(geometry, material);
-
-    return retMesh;
-  };
 
   useEffect(() => {
-    if (!mountRef.current) return;
-
-    // Initialize the scene, camera, and renderer
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, 1.5, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(600, 400);
-    mountRef.current.appendChild(renderer.domElement);
-    sceneRef.current = scene;
+    rendererRef.current = renderer;
 
-    camera.position.set(0, 0, 100);
-    cameraRef.current = camera;
+    mountRef.current!.appendChild(rendererRef.current.domElement);
+
+    const scene = new THREE.Scene();
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040); // Soft ambient light
@@ -102,36 +67,94 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     scene.add(directionalLight);
     lightRef.current = directionalLight;
 
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, DEFAULT_ASPECT, DEFAULT_NEAR, DEFAULT_FAR);
+    camera.position.set(0, 0, 100);
+    cameraRef.current = camera;
+
     // OrbitControls setup
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(camera, rendererRef.current!.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+    freeFloatControlsRef.current = controls;
     controlsRef.current = controls;
 
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
+    cameraModeRef.current = CameraMode.FreeFloat;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!cameraRef.current || !controlsRef.current) return;
+
+      const moveSpeed = 10;
+
+      // If we're in free-float mode
+      if (controlsRef.current instanceof OrbitControls) {
+        switch (event.key) {
+          case 'w':
+            let north = new THREE.Vector3(0, 1, 0);
+            controlsRef.current.target.addScaledVector(north, moveSpeed);
+            cameraRef.current.position.addScaledVector(north, moveSpeed);
+            break;
+          case 's':
+            let south = new THREE.Vector3(0, -1, 0);
+            controlsRef.current.target.addScaledVector(south, moveSpeed);
+            cameraRef.current.position.addScaledVector(south, moveSpeed);
+            break;
+          case 'a':
+            let west = new THREE.Vector3(-1, 0, 0);
+            controlsRef.current.target.addScaledVector(west, moveSpeed);
+            cameraRef.current.position.addScaledVector(west, moveSpeed);
+            break;
+          case 'd':
+            let east = new THREE.Vector3(1, 0, 0);
+            controlsRef.current.target.addScaledVector(east, moveSpeed);
+            cameraRef.current.position.addScaledVector(east, moveSpeed);
+            break;
+        }
+      } 
+      freeFloatControlsRef.current!.update();
     };
-    animate();
+
+    window.addEventListener('keydown', handleKeyDown);
 
     // Clean up on unmount
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       mountRef.current?.removeChild(renderer.domElement);
-      renderer.dispose();
+      rendererRef.current!.dispose();
     };
   }, []);
 
-  
-  useEffect(() => {
-    if (!props.world) return;
-    if (props.world.heightmap && sceneRef.current) {
-      const mesh = generateMesh(props.world.heightmap);
-      meshRef.current = mesh;
-      
-      sceneRef.current.clear();
+  const resetCamera = () => {
+    cameraRef.current!.fov = DEFAULT_FOV;
+    cameraRef.current!.aspect = DEFAULT_ASPECT;
+    cameraRef.current!.near = DEFAULT_NEAR;
+    cameraRef.current!.far = DEFAULT_FAR;
+    cameraRef.current!.position.set(0, 0, 100);
+  };
 
+
+  useEffect(() => {
+    // Clean up previous scene, renderer, etc.
+    if (sceneRef.current) {
+      while (sceneRef.current.children.length > 0) {
+        sceneRef.current.remove(sceneRef.current.children[0]);
+      }
+    }
+
+    // Go back to free-explore when we create a new world
+    cameraModeRef.current = CameraMode.FreeFloat;
+
+    if (!mountRef.current || !props.world || !rendererRef.current) return;
+
+    // Reset the clock and the camera
+    clockRef.current = new THREE.Clock();
+    
+    resetCamera();
+
+    if (props.world.heightmap && sceneRef.current) {
+      const mesh = generateMesh(props.world);
+      meshRef.current = mesh;
 
       sceneRef.current.add(mesh);
 
@@ -161,14 +184,57 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         sceneRef.current.add(lightRef.current);
       }
     }
+    
+    let animationId: number;
+
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+
+      const delta = clockRef.current!.getDelta(); // Time between frames
+
+      // Update the camera's fall if in free-fall mode
+      if (cameraModeRef.current === CameraMode.FreeFall) {
+        fallSpeedRef.current += gravity * delta; // Increase fall speed due to gravity
+        cameraRef.current!.position.z -= fallSpeedRef.current * delta; // Move camera downwards
+
+        // Check if the camera has hit the terrain
+        const down = new THREE.Vector3(0, 0, -1);
+        const raycaster = new THREE.Raycaster();
+
+        raycaster.set(cameraRef.current!.position, down);
+        const collisionResults = raycaster.intersectObject(meshRef.current!);
+
+        if (collisionResults.length > 0) {
+          if (collisionResults[0].distance <= fallSpeedRef.current * delta) {
+            cameraRef.current!.position.z = 5;
+            cameraRef.current!.lookAt(new THREE.Vector3(1, 0, 0));
+            cameraModeRef.current = CameraMode.Walking;
+            fallSpeedRef.current = 0;
+          }
+        }
+      }
+      else {
+        freeFloatControlsRef.current!.update();
+      }
+      
+      rendererRef.current!.render(sceneRef.current!, cameraRef.current!);
+    };
+
+    animate();
+
+    return () => cancelAnimationFrame(animationId);
+
   }, [props.world]);
 
+  
   const handleResetView = () => {
     if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(0, 50, 100);
-      cameraRef.current.fov = 75; // Reset FOV to default
+      resetCamera();
+      cameraModeRef.current = CameraMode.FreeFloat;
       cameraRef.current.updateProjectionMatrix();
-      controlsRef.current.reset();
+      freeFloatControlsRef.current!.reset();
+      freeFloatControlsRef.current!.enabled = true;
+      controlsRef.current = freeFloatControlsRef.current!;
     }
   };
 
@@ -182,53 +248,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       10 // Z position above the ground
     );
     cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
-    controlsRef.current.target.copy(townSquarePosition); // Set the controls' target to the town square
-    controlsRef.current.update();
+    freeFloatControlsRef.current!.target.copy(townSquarePosition); // Set the controls' target to the town square
+    freeFloatControlsRef.current!.update();
   };
-
-  // Handle WASD movement based on camera's local axes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (!cameraRef.current || !controlsRef.current) return;
-
-        const moveSpeed = 10;
-
-        switch (event.key) {
-          case 'w':
-            let north = new THREE.Vector3(0, 1, 0);
-            controlsRef.current.target.addScaledVector(north, moveSpeed);
-            cameraRef.current.position.addScaledVector(north, moveSpeed);
-            break;
-          case 's':
-            let south = new THREE.Vector3(0, -1, 0);
-            controlsRef.current.target.addScaledVector(south, moveSpeed);
-            cameraRef.current.position.addScaledVector(south, moveSpeed);
-            break;
-          case 'a':
-            let west = new THREE.Vector3(-1, 0, 0);
-            controlsRef.current.target.addScaledVector(west, moveSpeed);
-            cameraRef.current.position.addScaledVector(west, moveSpeed);
-            break;
-          case 'd':
-            let east = new THREE.Vector3(1, 0, 0);
-            controlsRef.current.target.addScaledVector(east, moveSpeed);
-            cameraRef.current.position.addScaledVector(east, moveSpeed);
-            break;
-        }
-
-        controlsRef.current.update();
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-      };
-    };
-  }, []);
-
   return (
     <div className='p-4'>
       <div ref={mountRef} style={{
@@ -246,6 +268,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         onClick={moveCameraAboveTownSquare}
         style={{ position: 'relative', bottom: '-20px', right: '-60px', zIndex: 10 }}>
         Go to Town Center
+      </Button>
+      <Button  
+        onClick={() => {
+          freeFloatControlsRef.current!.enabled = false;
+          cameraModeRef.current = CameraMode.FreeFall;
+          console.log("Free fall");
+        }}
+        style={{ position: 'relative', bottom: '-20px', right: '-110px', zIndex: 10 }}>
+        Free Fall
       </Button>
     </div>
   );
