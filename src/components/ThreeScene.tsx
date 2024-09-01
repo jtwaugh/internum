@@ -148,12 +148,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     const handleBlur = () => {
       console.log('ThreeScene lost focus, stopping key listeners');
-      containerRef.current.removeEventListener('keydown', handleKeyDown);
+      containerRef.current!.removeEventListener('keydown', handleKeyDown);
     };
 
     const handleFocus = () => {
       console.log('ThreeScene gained focus, adding key listeners');
-      containerRef.current.addEventListener('keydown', handleKeyDown);
+      containerRef.current!.addEventListener('keydown', handleKeyDown);
     };
 
     // Game logic: Initialize to free-float mode
