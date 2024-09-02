@@ -11,3 +11,11 @@ export interface ColorsConfig {
   ambientLight: string;
   directionalLight: string;
 }
+
+export interface WorldGenParams {
+  noiseScale: number;
+  canvasSize: number;
+  threshold: number;
+  maxDistanceFactor: number;
+  blurIterations: number;
+}

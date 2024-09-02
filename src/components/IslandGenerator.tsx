@@ -3,14 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import p5 from 'p5';
 
-import { TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS, DEFAULT_GRADIENT, DEFAULT_AMBIENT_LIGHT_COLOR, DEFAULT_DIRECTIONAL_LIGHT_COLOR } from '@/constants';
+import * as Constants from '@/constants';
 
 import { Slider } from '@/components/ui/slider';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from './ui/label';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
-import { World, ColorsConfig } from '@/types';
+import { World, ColorsConfig, WorldGenParams } from '@/types';
 import GradientBuilder from './GradientBuilder';
 import { ColorHexInput } from './ColorHexInput';
 
@@ -18,25 +24,52 @@ import { ColorHexInput } from './ColorHexInput';
 interface IslandGeneratorProps {
   onWorldGenerated: (world: World | null) => void;
   onColorsChanged: (colorsConfig: ColorsConfig) => void;
+  onParamsChanged: (params: WorldGenParams) => void;
+  params: WorldGenParams;
   display: boolean;
 }
 
 const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorProps) => {
-  const [noiseScale, setNoiseScale] = useState(0.1);
-  const [canvasSize, setCanvasSize] = useState(400);
-  const [threshold, setThreshold] = useState(0.5);
-  const [maxDistanceFactor, setMaxDistanceFactor] = useState(1);
-  const [blurIterations, setBlurIterations] = useState(1);
+  const [noiseScale, setNoiseScale] = useState(props.params.noiseScale);
+  const [canvasSize, setCanvasSize] = useState(props.params.canvasSize);
+  const [threshold, setThreshold] = useState(props.params.threshold);
+  const [maxDistanceFactor, setMaxDistanceFactor] = useState(props.params.maxDistanceFactor);
+  const [blurIterations, setBlurIterations] = useState(props.params.blurIterations);
 
-  const [gradient, setGradient] = useState(DEFAULT_GRADIENT);
-  const [ambientLightColor, setAmbientLightColor] = useState(DEFAULT_AMBIENT_LIGHT_COLOR);
-  const [directionalLightColor, setDirectionalLightColor] = useState(DEFAULT_DIRECTIONAL_LIGHT_COLOR);
+  const [gradient, setGradient] = useState(Constants.DEFAULT_GRADIENT);
+  const [ambientLightColor, setAmbientLightColor] = useState(Constants.DEFAULT_AMBIENT_LIGHT_COLOR);
+  const [directionalLightColor, setDirectionalLightColor] = useState(Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR);
 
-  // Section for island generation
 
   useEffect(() => {
-    props.onColorsChanged({terrainGradient: gradient, ambientLight: ambientLightColor, directionalLight: directionalLightColor});
+    props.onColorsChanged(
+      {
+        terrainGradient: gradient, 
+        ambientLight: ambientLightColor, 
+        directionalLight: directionalLightColor
+      }
+    );
   }, [gradient, ambientLightColor, directionalLightColor]);
+
+  useEffect(() => {
+    props.onParamsChanged(
+      {
+        noiseScale: noiseScale,
+        canvasSize: canvasSize,
+        threshold: threshold,
+        maxDistanceFactor: maxDistanceFactor,
+        blurIterations: blurIterations
+      }
+    )
+  }, [noiseScale, canvasSize, threshold, maxDistanceFactor, blurIterations])
+
+  useEffect(() => {
+    setNoiseScale(props.params.noiseScale);
+    setCanvasSize(props.params.canvasSize);
+    setThreshold(props.params.threshold);
+    setMaxDistanceFactor(props.params.maxDistanceFactor);
+    setBlurIterations(props.params.blurIterations);
+  }, [props.params]);
 
   const generateHeightmap = (p: p5): number[][] => {
     const heightmap: number[][] = [];
@@ -258,7 +291,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     const blurredHeightmap = blurHeightmap(heightmap);
   
     const townSquarePosition = getRandomLandTile(blurredHeightmap);
-    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, TEMPLE_MIN_RADIUS, TEMPLE_MAX_RADIUS);
+    const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, Constants.TEMPLE_MIN_RADIUS, Constants.TEMPLE_MAX_RADIUS);
     const docksPosition = findClosestWaterBorder(blurredHeightmap, townSquarePosition);
 
     props.onWorldGenerated({heightmap: blurredHeightmap, townSquare: townSquarePosition, temple: templePosition, docks: docksPosition});
@@ -275,15 +308,15 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
 
   return (
     <div id='island-generator-container' tabIndex={1}>
-      <div className='p-4 flex justify-center'>
-        <Label className='text-4xl font-extrabold'>Demiurge Studio</Label>
+      <div className='p-4 flex justify-center bg-primary'>
+        <Label className='text-4xl font-extrabold text-white'>Demiurge Studio</Label>
       </div>
       
-      <div className="flex bg-primary border-input items-center">
+      <div className="flex border-input items-center bg-primary">
         <div className="flex w-1/3 p-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline">Worldgen Parameters</Button>
+              <Button variant="outline">{window.innerWidth > 600 ? "Worldgen Parameters" : "🌐"}</Button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
               <div>
@@ -363,28 +396,25 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
         <div className="flex w-1/3 p-2 justify-end">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline">Color Parameters</Button>
+              <Button variant="outline">{window.innerWidth > 600 ? "Color Parameters" : "🎨"}</Button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
-              <ColorHexInput text="Ambient Light" value={ambientLightColor} placeholder={DEFAULT_AMBIENT_LIGHT_COLOR} onChange={setAmbientLightColor}></ColorHexInput>
-              <ColorHexInput text="Directional Light" value={directionalLightColor} placeholder={DEFAULT_DIRECTIONAL_LIGHT_COLOR} onChange={setDirectionalLightColor}></ColorHexInput>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <div className='flex space-x-4'>
-                    <div className='w-1/2 flex justify-start'>
-                      <Button variant="outline">Gradient</Button>
-                    </div>
-                    <div className='w-1/2 flex justify-end'>
-                      <div className='aspect-square border rounded-md' style={{
+              <ColorHexInput text="Ambient Light" value={ambientLightColor} placeholder={Constants.DEFAULT_AMBIENT_LIGHT_COLOR} onChange={setAmbientLightColor}></ColorHexInput>
+              <ColorHexInput text="Directional Light" value={directionalLightColor} placeholder={Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR} onChange={setDirectionalLightColor}></ColorHexInput>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1">
+                  <AccordionTrigger className='flex'>
+                    <div className='w-1/2 text-start'>Gradient</div> 
+                    <div className='w-1/2 border h-full rounded-md mr-2 ml-4' style={{
                           background: `linear-gradient(180deg, ${gradient[3]}, ${gradient[2]}, ${gradient[1]}, ${gradient[0]})`,
                         }}/>
-                    </div>
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <GradientBuilder currentGradient={gradient} onChange={onGradientChanged}/>
-                </PopoverContent>
-              </Popover>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <GradientBuilder currentGradient={gradient} onChange={onGradientChanged}/>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </PopoverContent>
           </Popover>
         </div>

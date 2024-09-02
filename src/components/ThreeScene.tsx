@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { ColorsConfig, World } from '@/types';
 import { drawTemple, drawTownLocations, drawTownSquare, generateMesh } from '@/app/models';
 
+
+
 const DEBUG_DRAW_TOWN_LOCATIONS = true;
 
 const DEFAULT_FOV = 75;
@@ -60,6 +62,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
+
   const resetCamera = () => {
     cameraRef.current!.fov = DEFAULT_FOV;
     cameraRef.current!.aspect = DEFAULT_ASPECT;
@@ -72,6 +75,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   // Physics for free-fall
   const fallSpeedRef = useRef(0); // Use ref to persist fall speed across renders
   const gravity = 9.81; // Simulating gravity
+  
 
   useEffect(() => {
     colorConfigRef.current = props.colorsConfig;
@@ -82,7 +86,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   useEffect(() => {
     // Constructor: Components setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(Math.min(window.innerWidth - 100, 600), 400);
+    renderer.setSize(Math.min(window.innerWidth, 600), 400);
     rendererRef.current = renderer;
 
     mountRef.current!.appendChild(rendererRef.current.domElement);
@@ -144,16 +148,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         }
       } 
       freeFloatControlsRef.current!.update();
-    };
-
-    const handleBlur = () => {
-      console.log('ThreeScene lost focus, stopping key listeners');
-      containerRef.current!.removeEventListener('keydown', handleKeyDown);
-    };
-
-    const handleFocus = () => {
-      console.log('ThreeScene gained focus, adding key listeners');
-      containerRef.current!.addEventListener('keydown', handleKeyDown);
     };
 
     // Game logic: Initialize to free-float mode
@@ -302,7 +296,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     if (shouldBeFullscreen) {
       rendererRef.current!.setSize(window.innerWidth - 100, window.innerHeight - 100);
     } else {
-      rendererRef.current!.setSize(600, 400);
+      rendererRef.current!.setSize(Math.min(window.innerWidth, 600), 400);
     }
     setIsFullscreen(shouldBeFullscreen);
     props.handleFullscreenChange(shouldBeFullscreen);
@@ -331,7 +325,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
               <div className='flex w-1/3 justify-center'>
                 <Button  
                   onClick={moveCameraAboveTownSquare}>
-                  Go to Town Center
+                  {window.innerWidth > 600 ? "Go to Town Center" : "🏘️"}
                 </Button>
               </div>
               <div className='flex w-1/3 justify-end'>
@@ -345,10 +339,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
                 </Button>
               </div>
             </div>
-          </div>
-
-          
-        
+          </div>  
         </div>
       </div>
     </div>
