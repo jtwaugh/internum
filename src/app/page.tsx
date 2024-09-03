@@ -12,27 +12,20 @@ const IslandGenerator = dynamic(() => import('../components/ui/worldgen-frame'),
   ssr: false,
 });
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 import * as Constants from '@/constants';
 
-import { ColorsConfig, World, WorldGenParams } from '@/types';
+import { ColorsConfig, DisplayParams, World, WorldGenParams } from '@/types';
 
 import {
   Menubar,
-  MenubarCheckboxItem,
   MenubarContent,
   MenubarItem,
   MenubarMenu,
-  MenubarRadioGroup,
-  MenubarRadioItem,
-  MenubarSeparator,
-  MenubarShortcut,
-  MenubarSub,
-  MenubarSubContent,
-  MenubarSubTrigger,
   MenubarTrigger,
 } from "@/components/ui/menubar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,6 +64,11 @@ export default function Home() {
         threshold: Constants.DEFAULT_THRESHOLD,
         maxDistanceFactor: Constants.DEFAULT_MAX_DISTANCE_FACTOR,
         blurIterations: Constants.DEFAULT_BLUR_ITERATIONS
+    }
+  )
+  const [currentDisplayParams, setCurrentDisplayParams] = useState<DisplayParams>(
+    {
+      showStructureFlares: true
     }
   )
 
@@ -142,13 +140,17 @@ export default function Home() {
   }, [currentColors]);
 
   useEffect(() => {
-    console.log(currentParams);
+    //console.log(currentParams);
   }, [currentParams]);
+
+  useEffect(() => {
+    console.log(currentDisplayParams);
+  }, [currentDisplayParams]);
 
   return (
     <div className='flex flex-col w-full  min-h-screen bg-slate-100'>
-      <div className='p-4 flex justify-center bg-primary border'>
-        <Label className='text-4xl font-extrabold text-white'>Demiurge Studio</Label>
+      <div className='p-4 flex justify-center bg-white border'>
+        <Label className='text-4xl font-extrabold'>Demiurge Studio</Label>
       </div>
       <div className='flex flex-1'>
         <div className='w-1/3 flex flex-col'>
@@ -205,13 +207,23 @@ export default function Home() {
             <MenubarMenu>
               <MenubarTrigger>🔍 View</MenubarTrigger>
               <MenubarContent>
-                <MenubarItem>
-                  qewr
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.showStructureFlares}
+                    id='show-structure-flares' 
+                    onClick={
+                      () => {
+                        const newParams = {showStructureFlares: !currentDisplayParams.showStructureFlares};
+                        console.log(newParams);
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-structure-flares' className='px-2'>Show structure flares</Label>
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           </Menubar>
-          <ThreeScene world={currentWorld} colorsConfig={currentColors} handleFullscreenChange={setIsFullscreen}/>
+          <ThreeScene world={currentWorld} colorsConfig={currentColors} displayParams={currentDisplayParams} handleFullscreenChange={setIsFullscreen}/>
         </div>
       </div>
       

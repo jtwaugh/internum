@@ -179,11 +179,6 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
         color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.5) * 2));
       }
 
-      // DEBUG
-      if (x === world.townSquare.x && y === world.townSquare.y) {
-        color = new THREE.Color(0xff00ff);
-      }
-
       colors.push(color.r, color.g, color.b);
     }
 

@@ -19,3 +19,7 @@ export interface WorldGenParams {
   maxDistanceFactor: number;
   blurIterations: number;
 }
+
+export interface DisplayParams {
+  showStructureFlares: boolean;
+}

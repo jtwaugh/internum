@@ -6,21 +6,14 @@ import * as THREE from 'three';
 import { OrbitControls, PointerLockControls } from 'three/examples/jsm/Addons.js';
 import { Button } from './ui/button';
 
-import { ColorsConfig, World } from '@/types';
+import * as Constants from '@/constants';
+import { ColorsConfig, DisplayParams, World } from '@/types';
 import { drawTemple, drawTownLocations, drawTownSquare, generateMesh } from '@/app/models';
-
-
-
-const DEBUG_DRAW_TOWN_LOCATIONS = true;
-
-const DEFAULT_FOV = 75;
-const DEFAULT_ASPECT = 1.5;
-const DEFAULT_NEAR = 0.1;
-const DEFAULT_FAR = 1000;
 
 export interface ThreeSceneProps {
   world: World | null;
   colorsConfig: ColorsConfig;
+  displayParams: DisplayParams;
   handleFullscreenChange: Function;
 }
 
@@ -62,12 +55,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
+  // Track refs for models that we turn on or off
+  const flaresRef = useRef<THREE.Mesh[] | null>(null);
+
 
   const resetCamera = () => {
-    cameraRef.current!.fov = DEFAULT_FOV;
-    cameraRef.current!.aspect = DEFAULT_ASPECT;
-    cameraRef.current!.near = DEFAULT_NEAR;
-    cameraRef.current!.far = DEFAULT_FAR;
+    cameraRef.current!.fov = Constants.DEFAULT_FOV;
+    cameraRef.current!.aspect = Constants.DEFAULT_ASPECT;
+    cameraRef.current!.near = Constants.DEFAULT_NEAR;
+    cameraRef.current!.far = Constants.DEFAULT_FAR;
     cameraRef.current!.position.set(0, 0, 100);
   };
 
@@ -117,7 +113,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     sceneRef.current = scene;
 
     // Constructor: Camera setup
-    const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, DEFAULT_ASPECT, DEFAULT_NEAR, DEFAULT_FAR);
+    const camera = new THREE.PerspectiveCamera(Constants.DEFAULT_FOV, Constants.DEFAULT_ASPECT, Constants.DEFAULT_NEAR, Constants.DEFAULT_FAR);
     camera.position.set(0, 0, 100);
     cameraRef.current = camera;
 
@@ -178,6 +174,20 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
+  // Add or remove flares
+  useEffect(() =>{
+    if (!sceneRef.current || !props.world || !meshRef.current) return;
+    if (props.displayParams.showStructureFlares) {
+      const [townSquare, temple, docks] = drawTownLocations(props.world!, meshRef.current!);
+      flaresRef.current = [townSquare, temple, docks];
+      sceneRef.current.add(townSquare);
+      sceneRef.current.add(temple);
+      sceneRef.current.add(docks);
+    } else {
+      flaresRef.current!.forEach((thing) => {sceneRef.current!.remove(thing);})
+    }
+  }, [props.displayParams.showStructureFlares])
+
   useEffect(() => {
     const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
     ambientLightRef.current = ambientLight;
@@ -213,13 +223,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       meshRef.current = mesh;
 
       sceneRef.current.add(mesh);
-
-      if (DEBUG_DRAW_TOWN_LOCATIONS) {
-        const [townSquare, temple, docks] = drawTownLocations(props.world, mesh);
-        sceneRef.current.add(townSquare);
-        sceneRef.current.add(temple);
-        sceneRef.current.add(docks);
-      }
 
       const [platform, columns] = drawTemple(props.world, mesh, 12);
       sceneRef.current.add(platform);
