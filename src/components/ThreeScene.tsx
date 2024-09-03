@@ -330,7 +330,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
           </Button>
         </div>
 
-        <div ref={mountRef} className='h-full w-full'/>
+        <div ref={mountRef} className='h-full w-full bg-primary'/>
 
         <div id="buttons-container" className='relative'>
           <div className='flex p-4 absolute bottom-1 left-1 z-10'>

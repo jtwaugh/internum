@@ -114,8 +114,8 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
         </div>
         <Tabs defaultValue="worldgen" className="flex-1 flex flex-col p-2">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger ref={paramsButtonRef} value="worldgen">{paramsButtonWidth > 100 ? "Parameters" : "🌐"}</TabsTrigger>
-            <TabsTrigger ref={colorsButtonRef} value="colors">{colorsButtonWidth > 100 ? "Colors" : "🎨"}</TabsTrigger>
+            <TabsTrigger ref={paramsButtonRef} value="worldgen">{paramsButtonWidth > 100 ? "🌐 Parameters" : "🌐"}</TabsTrigger>
+            <TabsTrigger ref={colorsButtonRef} value="colors">{colorsButtonWidth > 100 ? "🎨 Colors" : "🎨"}</TabsTrigger>
           </TabsList>
           <TabsContent value="worldgen" className='flex-1 bg-slate-50 border rounded-md p-2'>
             <div>

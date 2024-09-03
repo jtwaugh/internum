@@ -160,10 +160,10 @@ export default function Home() {
             display={!isFullscreen} 
           />
         </div>
-        <div className='flex-1 flex flex-col'>
-          <Menubar className='bg-primary'>
+        <div className='flex-1 flex flex-col p-2'>
+          <Menubar>
             <MenubarMenu>
-              <MenubarTrigger className='text-white'>File</MenubarTrigger>
+              <MenubarTrigger>📜 File</MenubarTrigger>
               <MenubarContent>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}} onPointerMove={(e)=>{e.preventDefault()}}>
                   <Popover>
@@ -191,6 +191,22 @@ export default function Home() {
                       <Button className="w-full" onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
                     </PopoverContent>
                   </Popover>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger>🖌️ Edit</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  adsf
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+            <MenubarMenu>
+              <MenubarTrigger>🔍 View</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  qewr
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
