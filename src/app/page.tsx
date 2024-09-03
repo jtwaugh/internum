@@ -18,6 +18,21 @@ import * as Constants from '@/constants';
 
 import { ColorsConfig, World, WorldGenParams } from '@/types';
 
+import {
+  Menubar,
+  MenubarCheckboxItem,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarRadioGroup,
+  MenubarRadioItem,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarSub,
+  MenubarSubContent,
+  MenubarSubTrigger,
+  MenubarTrigger,
+} from "@/components/ui/menubar";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -146,37 +161,40 @@ export default function Home() {
           />
         </div>
         <div className='flex-1 flex flex-col'>
-          <div id="buttons-container" className="relative">
-            <div className='flex p-4'>
-              <div className='flex w-1/2 justify-start'>
-                <Popover>
-                  <PopoverTrigger asChild>
-                      <Button>Import</Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <Textarea 
-                    className="max-h-24 overflow-y-auto break-all" 
-                    placeholder="Paste seed" 
-                    value={importText} 
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
-                    />
-                    <Button className="w-full" onClick={handleImportConfig}>{imported ? "Uploaded!" : "Upload"} </Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className='flex w-1/2 justify-end'>
-                <Popover>
-                  <PopoverTrigger asChild>
-                      <Button onClick={() => handleExportConfig(currentParams, currentColors)}>Export</Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <Textarea className="max-h-24 overflow-y-auto break-all self-start" onClick={handleCopy}>{currentSeed}</Textarea>
-                    <Button className="w-full" onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-          </div>
+          <Menubar className='bg-primary'>
+            <MenubarMenu>
+              <MenubarTrigger className='text-white'>File</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}} onPointerMove={(e)=>{e.preventDefault()}}>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                        <span>Import</span>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start">
+                      <Textarea 
+                      className="max-h-24 overflow-y-auto break-all" 
+                      placeholder="Paste seed" 
+                      value={importText} 
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
+                      />
+                      <Button className="w-full" onClick={handleImportConfig}>{imported ? "Uploaded!" : "Upload"} </Button>
+                    </PopoverContent>
+                  </Popover>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}} onPointerMove={(e)=>{e.preventDefault()}}>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                        <span onClick={() => handleExportConfig(currentParams, currentColors)}>Export</span>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start">
+                      <Textarea className="max-h-24 overflow-y-auto break-all self-start" onClick={handleCopy}>{currentSeed}</Textarea>
+                      <Button className="w-full" onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
+                    </PopoverContent>
+                  </Popover>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          </Menubar>
           <ThreeScene world={currentWorld} colorsConfig={currentColors} handleFullscreenChange={setIsFullscreen}/>
         </div>
       </div>
