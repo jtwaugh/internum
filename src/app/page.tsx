@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 const ThreeScene = dynamic(() => import('../components/ThreeScene'), {
   ssr: false,
 });
-const IslandGenerator = dynamic(() => import('../components/IslandGenerator'), {
+const IslandGenerator = dynamic(() => import('../components/ui/worldgen-frame'), {
   ssr: false,
 });
 
@@ -19,6 +19,7 @@ import * as Constants from '@/constants';
 import { ColorsConfig, World, WorldGenParams } from '@/types';
 
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -130,46 +131,56 @@ export default function Home() {
   }, [currentParams]);
 
   return (
-    <div className='h-screen w-full bg-slate-100'>
-      <IslandGenerator 
-        params={currentParams}
-        onWorldGenerated={setCurrentWorld} 
-        onColorsChanged={setCurrentColors} 
-        onParamsChanged={setCurrentParams} 
-        display={!isFullscreen} 
-      />
-      <div id="buttons-container" className="relative">
-        <div className='flex p-4'>
-          <div className='flex w-1/2 justify-start'>
-            <Popover>
-              <PopoverTrigger asChild>
-                  <Button>Import</Button>
-              </PopoverTrigger>
-              <PopoverContent>
-                <Textarea 
-                className="max-h-24 overflow-y-auto break-all" 
-                placeholder="Paste seed" 
-                value={importText} 
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
-                />
-                <Button className="w-full" onClick={handleImportConfig}>{imported ? "Uploaded!" : "Upload"} </Button>
-              </PopoverContent>
-            </Popover>
+    <div className='flex flex-col w-full  min-h-screen bg-slate-100'>
+      <div className='p-4 flex justify-center bg-primary border'>
+        <Label className='text-4xl font-extrabold text-white'>Demiurge Studio</Label>
+      </div>
+      <div className='flex flex-1'>
+        <div className='w-1/3 flex flex-col'>
+          <IslandGenerator 
+            params={currentParams}
+            onWorldGenerated={setCurrentWorld} 
+            onColorsChanged={setCurrentColors} 
+            onParamsChanged={setCurrentParams} 
+            display={!isFullscreen} 
+          />
+        </div>
+        <div className='flex-1 flex flex-col'>
+          <div id="buttons-container" className="relative">
+            <div className='flex p-4'>
+              <div className='flex w-1/2 justify-start'>
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <Button>Import</Button>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <Textarea 
+                    className="max-h-24 overflow-y-auto break-all" 
+                    placeholder="Paste seed" 
+                    value={importText} 
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
+                    />
+                    <Button className="w-full" onClick={handleImportConfig}>{imported ? "Uploaded!" : "Upload"} </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className='flex w-1/2 justify-end'>
+                <Popover>
+                  <PopoverTrigger asChild>
+                      <Button onClick={() => handleExportConfig(currentParams, currentColors)}>Export</Button>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <Textarea className="max-h-24 overflow-y-auto break-all self-start" onClick={handleCopy}>{currentSeed}</Textarea>
+                    <Button className="w-full" onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </div>
-          <div className='flex w-1/2 justify-end'>
-            <Popover>
-              <PopoverTrigger asChild>
-                  <Button onClick={() => handleExportConfig(currentParams, currentColors)}>Export</Button>
-              </PopoverTrigger>
-              <PopoverContent>
-                <Textarea className="max-h-24 overflow-y-auto break-all self-start" onClick={handleCopy}>{currentSeed}</Textarea>
-                <Button className="w-full" onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
-              </PopoverContent>
-            </Popover>
-          </div>
+          <ThreeScene world={currentWorld} colorsConfig={currentColors} handleFullscreenChange={setIsFullscreen}/>
         </div>
       </div>
-      <ThreeScene world={currentWorld} colorsConfig={currentColors} handleFullscreenChange={setIsFullscreen}/>
+      
     </div>
   );
 }

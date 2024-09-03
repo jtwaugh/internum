@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Input } from './input';
+import { Label } from './label';
 
 export interface ColorHexInputProps {
     text: string;

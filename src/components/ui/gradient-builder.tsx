@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { ColorHexInput } from './ColorHexInput';
+import { ColorHexInput } from './color-hex-input';
 import { DEFAULT_GRADIENT } from '@/constants';
 
 export interface GradientBuilderProps {

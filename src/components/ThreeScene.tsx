@@ -77,6 +77,18 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const gravity = 9.81; // Simulating gravity
   
 
+  const resizeRendererToDisplaySize = () => {
+    const width = mountRef.current?.clientWidth;
+    const height = mountRef.current?.clientHeight;
+  
+    // Set the renderer size
+    rendererRef.current?.setSize(width!, height!);
+    
+    // Optionally, update the camera aspect ratio and projection matrix if needed
+    cameraRef.current!.aspect = width! / height!;
+    cameraRef.current!.updateProjectionMatrix();
+  }
+
   useEffect(() => {
     colorConfigRef.current = props.colorsConfig;
     console.log(props.colorsConfig);
@@ -86,7 +98,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   useEffect(() => {
     // Constructor: Components setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(Math.min(window.innerWidth, 600), 400);
     rendererRef.current = renderer;
 
     mountRef.current!.appendChild(rendererRef.current.domElement);
@@ -109,6 +120,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, DEFAULT_ASPECT, DEFAULT_NEAR, DEFAULT_FAR);
     camera.position.set(0, 0, 100);
     cameraRef.current = camera;
+
+    resizeRendererToDisplaySize();
 
     // Constructor: OrbitControls setup
     const orbitControls = new OrbitControls(camera, rendererRef.current!.domElement);
@@ -149,6 +162,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       } 
       freeFloatControlsRef.current!.update();
     };
+
+    
+    window.addEventListener('resize', resizeRendererToDisplaySize);
 
     // Game logic: Initialize to free-float mode
     controlsRef.current = orbitControls;
@@ -292,55 +308,50 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   };
 
   const onFullscreenClick = () => {
+    return;
     const shouldBeFullscreen = !isFullscreen;
     if (shouldBeFullscreen) {
-      rendererRef.current!.setSize(window.innerWidth - 100, window.innerHeight - 100);
+      rendererRef.current!.setSize(window.innerWidth, window.innerHeight);
     } else {
-      rendererRef.current!.setSize(Math.min(window.innerWidth, 600), 400);
+      resizeRendererToDisplaySize();
     }
     setIsFullscreen(shouldBeFullscreen);
     props.handleFullscreenChange(shouldBeFullscreen);
   }
 
+  
+
   return (
-    <div ref={containerRef} id='three-container' tabIndex={0} className='p-4'>
-      <div className='flex h-full justify-center'>
-        <div>
+    <div ref={containerRef} id='three-container' tabIndex={0} className='p-4 flex-1'>
+      <div className='h-full justify-center'>
         <div id="fullscreen-button-container" className="relative">
-            <Button id="fullscreen-btn" onClick={onFullscreenClick} className="absolute top-1 right-2 z-10 px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70">
-            『』
-            </Button>
-          </div>
-
-          <div ref={mountRef} />
-
-          <div id="buttons-container" className="relative">
-            <div className='flex p-4'>
-              <div className='flex w-1/3'>
-                <Button 
-                  onClick={handleResetView}>
-                  Reset View
-                </Button>
-              </div>
-              <div className='flex w-1/3 justify-center'>
-                <Button  
-                  onClick={moveCameraAboveTownSquare}>
-                  {window.innerWidth > 600 ? "Go to Town Center" : "🏘️"}
-                </Button>
-              </div>
-              <div className='flex w-1/3 justify-end'>
-                <Button  
-                  onClick={() => {
-                    freeFloatControlsRef.current!.enabled = false;
-                    cameraModeRef.current = CameraMode.FreeFall;
-                    console.log("Free fall");
-                  }}>
-                  Free Fall
-                </Button>
-              </div>
-            </div>
-          </div>  
+          <Button id="fullscreen-btn" onClick={onFullscreenClick} className="absolute top-1 right-2 z-10 p-4 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70">
+          『』
+          </Button>
         </div>
+
+        <div ref={mountRef} className='h-full w-full'/>
+
+        <div id="buttons-container" className='relative'>
+          <div className='flex p-4 absolute bottom-1 left-1 z-10'>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={handleResetView}>
+                🗺️
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={moveCameraAboveTownSquare}>
+                🏘️
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  freeFloatControlsRef.current!.enabled = false;
+                  cameraModeRef.current = CameraMode.FreeFall;
+                  console.log("Free fall");
+                }}>
+                🪂
+              </Button>
+          </div>
+        </div>  
       </div>
     </div>
   );
