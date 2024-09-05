@@ -68,7 +68,11 @@ export default function Home() {
   )
   const [currentDisplayParams, setCurrentDisplayParams] = useState<DisplayParams>(
     {
-      showStructureFlares: true
+      drawTerrain: true,
+      drawStructures: true,
+      showStructureFlares: false,
+      showWaterAccumulation: false,
+      showFlowDirections: false,
     }
   )
 
@@ -104,7 +108,6 @@ export default function Home() {
   
     // TODO must validate
     const decompressedSeed = pako.inflate(base64ToUint8Array(importText), { to: 'string' });
-    console.log('Decompressed config:', decompressedSeed);
     const newConfig = deserializeConfig(decompressedSeed);
     setCurrentParams(newConfig.params);
     setCurrentColors(newConfig.colorsConfig);
@@ -126,8 +129,6 @@ export default function Home() {
   
     const compressedConfig = uint8ArrayToBase64(uint8Config);
   
-    console.log('Serialized Config:', serializedConfig);
-    console.log('Compressed Config:', compressedConfig);
     setCurrentSeed(compressedConfig.toString());
   };
 
@@ -144,7 +145,7 @@ export default function Home() {
   }, [currentParams]);
 
   useEffect(() => {
-    console.log(currentDisplayParams);
+    //console.log(currentDisplayParams);
   }, [currentDisplayParams]);
 
   return (
@@ -207,18 +208,70 @@ export default function Home() {
             <MenubarMenu>
               <MenubarTrigger>🔍 View</MenubarTrigger>
               <MenubarContent>
+              <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.drawTerrain}
+                    id='show-terrain' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, drawTerrain: !currentDisplayParams.drawTerrain};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-structure-flares' className='px-2'>Show terrain</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.drawStructures}
+                    id='show-structures' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, drawStructures: !currentDisplayParams.drawStructures};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-structure-flares' className='px-2'>Show structures</Label>
+                </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 
                     checked={currentDisplayParams.showStructureFlares}
                     id='show-structure-flares' 
                     onClick={
                       () => {
-                        const newParams = {showStructureFlares: !currentDisplayParams.showStructureFlares};
-                        console.log(newParams);
+                        const newParams = {...currentDisplayParams, showStructureFlares: !currentDisplayParams.showStructureFlares};
+                        
                         setCurrentDisplayParams(newParams);
                     }}
                   />
                   <Label htmlFor='show-structure-flares' className='px-2'>Show structure flares</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.showWaterAccumulation}
+                    id='show-water-accumulation' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, showWaterAccumulation: !currentDisplayParams.showWaterAccumulation};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-water-accumulation' className='px-2'>Show water accumulation</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.showFlowDirections}
+                    id='show-flow-direction' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, showFlowDirections: !currentDisplayParams.showFlowDirections};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-flow-direction' className='px-2'>Show flow direction</Label>
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>

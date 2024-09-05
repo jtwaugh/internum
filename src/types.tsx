@@ -1,5 +1,7 @@
 export interface World {
     heightmap: number[][];
+    flowDirections: (number | null)[][];
+    waterAccumulation: number[][];
     // Locations for generating the town
     townSquare: { x: number; y: number };
     temple: { x: number; y: number };
@@ -21,5 +23,9 @@ export interface WorldGenParams {
 }
 
 export interface DisplayParams {
+  drawTerrain: boolean;
+  drawStructures: boolean;
   showStructureFlares: boolean;
+  showFlowDirections: boolean;
+  showWaterAccumulation: boolean;
 }

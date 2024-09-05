@@ -1,3 +1,4 @@
+import { DIRECTION_OFFSETS } from "./constants";
 import { WorldGenParams } from "./types";
 import p5 from 'p5';
 
@@ -162,9 +163,6 @@ export const getRandomLandTile = (heightmap: number[][], params: WorldGenParams)
 
   const townSquareTile = landTiles[randomIndex];
 
-  console.log(townSquareTile);
-  console.log(heightmap[townSquareTile.x][townSquareTile.y]);
-
   return townSquareTile;
 };
 
@@ -219,3 +217,136 @@ export const generateWorldTerrain = (params: WorldGenParams): number[][] => {
   const heightmap = generateHeightmap(p5Instance, params);
   return blurHeightmap(heightmap, params);
 }
+
+// 1   2   3
+//   ↖ ↑ ↗
+// 8 ←   → 4
+//   ↙ ↓ ↘
+// 7   6   5
+export const computeFlowDirection = (heightmap: number[][]): (number | null)[][] => {
+  // New params
+  const slopeTolerance = 0.000001;
+  
+  const isLand = (num: number) => {return num > 0.0001}
+  
+  const height = heightmap.length;
+  const width = heightmap[0].length;
+  const flowDirection: (number | null)[][] = Array.from({ length: height }, () => Array(width).fill(null));
+
+  for (let x = 0; x < height; x++) {
+    for (let y = 0; y < width; y++) {
+      if (!isLand(heightmap[x][y])) continue; // Skip non-land tiles
+
+      let maxSlope = -Infinity;
+      let bestDirectionIndex: number | null = null;
+
+
+      // Check all 8 neighboring directions
+      for (let i = 0; i < DIRECTION_OFFSETS.length; i++) {
+        const [dx, dy] = DIRECTION_OFFSETS[i];
+        const nx = x + dx;
+        const ny = y + dy;
+
+        // Ensure neighbor is within bounds
+        if (nx >= 0 && nx < height && ny >= 0 && ny < width) {
+          // Prioritize going into the sea
+          const slope = (heightmap[nx][ny] > 0.0001 ? heightmap[x][y] - heightmap[nx][ny] : 1);
+          console.log("Slope from (", x, ", ", y, ") to (", nx, ", ", ny, "): ", slope);
+
+
+          if (slope > maxSlope) {
+            //console.log("Slope ", slope, " is steeper than the max ", maxSlope);
+            maxSlope = slope;
+            bestDirectionIndex = i; // Direction index from 1 to 8
+            //console.log("Best direction is ", bestDirectionIndex);
+          }
+          else {
+            console.log("Slope ", slope, " is not steeper the max ", maxSlope);
+          }
+        }
+      }
+
+      if (!(bestDirectionIndex === null)) {
+        const [finalDx, finalDy] = DIRECTION_OFFSETS[bestDirectionIndex];
+
+        console.log("Best direction is ", bestDirectionIndex," i.e. water will flow from (", x, ", ", y, ") to (", x + finalDx, ", ", y + finalDy, ")");
+
+        if (heightmap[x + finalDx][y + finalDy] > heightmap[x][y]) {
+          console.error("BIG ERROR");
+         }
+        //console.log("Max slope is ", maxSlope, " in direction ", bestDirectionIndex);
+        if (maxSlope < slopeTolerance) {
+          // We found a basin
+          console.log("Basin!")
+          flowDirection[x][y] = null;
+        } else {
+          console.log("Winner! ", bestDirectionIndex);
+          flowDirection[x][y] = bestDirectionIndex;
+        }
+      }
+
+      if (heightmap[x][y] > 0.0001 && (flowDirection[x][y] === null)) {
+        //console.log("Fail at ", x, ", ", y);
+        //console.log("Best index is ", bestDirectionIndex);
+        //console.log("Flow direction is ", flowDirection[x][y]);
+      }
+       
+    }
+  }
+  return flowDirection;
+}
+
+export const accumulateWater = (flowDirection: (number | null)[][], heightmap: number[][]): number[][] => {
+  const height = flowDirection.length;
+  const width = flowDirection[0].length;
+  
+  // Initialize water accumulation map
+  const waterAccumulation: number[][] = Array.from({ length: height }, () => Array(width).fill(0));
+
+  for (let x = 0; x < height; x++) {
+    for (let y = 0; y < width; y++) {
+      if (flowDirection[x][y] === null) continue;
+      
+      let currentX = x;
+      let currentY = y;
+
+      while (true) {
+        const direction = flowDirection[currentX][currentY];
+
+        if (direction === null) {
+          break;
+        }
+
+        // Get the neighbor offset for the flow direction
+        const [dx, dy] = DIRECTION_OFFSETS[direction]; // Direction index is 1-8, adjust to 0-based
+        
+        const nextX = currentX + dx;
+        const nextY = currentY + dy;
+
+        console.log("Direction from (", currentX, ", ", currentY, ") is ", direction, " i.e. water will flow to (", nextX, ", ", nextY, ")");
+
+        // Check bounds to ensure we're within the grid
+        if (nextX < 0 || nextX >= height || nextY < 0 || nextY >= width) {
+          break; // Flow goes out of bounds
+        }
+
+        if (heightmap[nextX][nextY] > heightmap[currentX][currentY]) {
+          console.error("BIG ERROR");
+         }
+
+        // Accumulate water in the next cell
+        waterAccumulation[nextX][nextY] += 1;
+
+        console.log("Starting from rainfall on cell (", x, ", ", y, ") accumulated 1 water unit from cell (", currentX, ", ", currentY, ") (height ", heightmap[currentX][currentY], ") to cell (", nextX, ", ", nextY, ") (height ", heightmap[nextX][nextY], ")");
+
+        // Move to the next cell
+        currentX = nextX;
+        currentY = nextY;        
+      }
+    }
+  }
+
+  console.log(waterAccumulation);
+
+  return waterAccumulation;
+};

@@ -16,7 +16,6 @@ const GradientBuilder = (props: GradientBuilderProps) => {
 
   useEffect(() =>
   {
-      console.log([waterColor, lowTopoColor, midTopoColor, highTopoColor]);
       props.onChange([waterColor, lowTopoColor, midTopoColor, highTopoColor]);
   }, [waterColor, lowTopoColor, midTopoColor, highTopoColor]);
 

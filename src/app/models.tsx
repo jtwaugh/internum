@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { ColorsConfig, World } from '@/types';
-import { MESH_THICKNESS } from '@/constants';
+import { MESH_THICKNESS, DIRECTION_OFFSETS } from '@/constants';
 
 
 const createThickLine = (start: THREE.Vector3, end: THREE.Vector3, color: number): THREE.Mesh => {
@@ -149,48 +149,112 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
     return `#${rgb.toString(16).padStart(6, '0')}`;
 }
 
- export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
-    console.log(colorsConfig);
+export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
+  const canvasSize = world.heightmap.length;
 
-    const canvasSize = world.heightmap.length;
+  const geometry = new THREE.PlaneGeometry(
+    canvasSize,
+    canvasSize,
+    canvasSize - 1,
+    canvasSize - 1
+  );
 
-    const geometry = new THREE.PlaneGeometry(
-      canvasSize,
-      canvasSize,
-      canvasSize - 1,
-      canvasSize - 1
-    );
+  let colors = [];
 
-    let colors = [];
+  for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
+    const x = Math.floor((i / 3) % canvasSize);
+    const y = Math.floor(i / 3 / canvasSize);
 
-    for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
-      const x = Math.floor((i / 3) % canvasSize);
-      const y = Math.floor(i / 3 / canvasSize);
+    // Set the Z value (height) from the heightmap
+    geometry.attributes.position.setZ(i / 3, world.heightmap[x][y] * 10); // Adjust multiplier for height scaling
 
-      // Set the Z value (height) from the heightmap
-      geometry.attributes.position.setZ(i / 3, world.heightmap[x][y] * 10); // Adjust multiplier for height scaling
-
-      let color;
-      if (world.heightmap[x][y] < 0.001) {
-        color = new THREE.Color(colorsConfig.terrainGradient[0]);
-      } else if (world.heightmap[x][y] < 0.5) {
-        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * 2));
-      } else {
-        color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.5) * 2));
-      }
-
-      colors.push(color.r, color.g, color.b);
+    let color;
+    if (world.heightmap[x][y] < 0.001) {
+      color = new THREE.Color(colorsConfig.terrainGradient[0]);
+    } else if (world.heightmap[x][y] < 0.5) {
+      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * 2));
+    } else {
+      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.5) * 2));
     }
 
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.computeVertexNormals();
+    colors.push(color.r, color.g, color.b);
+  }
 
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      flatShading: true,
-    });
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
 
-    const retMesh = new THREE.Mesh(geometry, material);
+  const material = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
 
-    return retMesh;
-  };
+  const retMesh = new THREE.Mesh(geometry, material);
+
+  return retMesh;
+};
+
+export const createWaterAccumulationField = (waterAccumulation: number[][]): THREE.Group => {
+  const gridSize = waterAccumulation.length;
+  const color = new THREE.Color(0x2222dd); // Same color for all particles (green)
+
+  const hexagons = new THREE.Group();
+
+  const displayThreshold = 0.05;
+
+  let scaler = 0;
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) { 
+      if (waterAccumulation[x][y] === null) continue;
+      if (waterAccumulation[x][y] > scaler) scaler = waterAccumulation[x][y];
+    }
+  }
+
+  // Create particles in a grid
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) {
+      if (waterAccumulation[x][y] === null) continue;
+      const scaledWaterAccumulation = waterAccumulation[x][y] / scaler;
+      if (scaledWaterAccumulation < displayThreshold) continue;
+      // Create hexagonal geometry (6 segments = hexagon)
+      const hexGeometry = new THREE.CircleGeometry(scaledWaterAccumulation, 4);
+
+      // Create material with transparency
+      const hexMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+      });
+
+      // Create hexagon mesh
+      const hexMesh = new THREE.Mesh(hexGeometry, hexMaterial);
+
+      // Position the hexagon in a grid
+      hexMesh.position.set(x - gridSize / 2, (gridSize - y) - gridSize / 2, 10);
+
+      hexagons.add(hexMesh);
+    }
+  }
+  
+  return hexagons;
+}
+
+export const createFlowDiagram = (flowDirections: (number | null)[][]): THREE.Group => {
+  const gridSize = flowDirections.length;
+  const arrowGroup = new THREE.Group();
+
+  for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+          const flowDirection = flowDirections[i][j];
+          if (!(flowDirection === null)) {
+            const offset = DIRECTION_OFFSETS[flowDirection];
+            // Convert the angle in radians to a direction vector
+            const arrowDir = new THREE.Vector3(offset[0], -offset[1], 0).normalize();
+            // Create the ArrowHelper with the direction vector
+            const arrowHelper = new THREE.ArrowHelper(arrowDir, new THREE.Vector3(i - gridSize / 2, (gridSize - j) - gridSize / 2, 12), 1, 0xaaaaff, 0.2, 0.2);
+            arrowGroup.add(arrowHelper);
+          }
+      }
+  }
+
+  //console.log(arrowGroup);
+
+  return arrowGroup;
+}

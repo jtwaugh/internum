@@ -8,7 +8,14 @@ import { Button } from './ui/button';
 
 import * as Constants from '@/constants';
 import { ColorsConfig, DisplayParams, World } from '@/types';
-import { drawTemple, drawTownLocations, drawTownSquare, generateMesh } from '@/app/models';
+import { 
+  drawTemple, 
+  drawTownLocations, 
+  drawTownSquare,
+  generateMesh, 
+  createFlowDiagram, 
+  createPrecipitationField 
+} from '@/app/models';
 
 export interface ThreeSceneProps {
   world: World | null;
@@ -56,7 +63,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
   // Track refs for models that we turn on or off
-  const flaresRef = useRef<THREE.Mesh[] | null>(null);
+  const flaresRef = useRef<THREE.Mesh[]>([]);
+  const structuresRef = useRef<THREE.Mesh[]>([]);
+  const arrowsRef = useRef<THREE.Group | null>(null);
+  const precipitationRef = useRef<THREE.Group | null>(null);
 
 
   const resetCamera = () => {
@@ -87,7 +97,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   useEffect(() => {
     colorConfigRef.current = props.colorsConfig;
-    console.log(props.colorsConfig);
   }, [props.colorsConfig]);
 
 
@@ -174,19 +183,90 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
-  // Add or remove flares
-  useEffect(() =>{
+  const drawTerrain = () => {
+    if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
+    const mesh = generateMesh(props.world, colorConfigRef.current);
+    meshRef.current = mesh;
+
+    sceneRef.current.add(mesh);
+  }
+
+  const drawStructures = () => {
+    if (!meshRef.current || !props.world || !sceneRef.current || !structuresRef.current) return;
+    const [platform, columns] = drawTemple(props.world, meshRef.current, 12);
+    structuresRef.current = structuresRef.current.concat(platform);
+    columns.forEach(column => {
+      structuresRef.current = structuresRef.current!.concat(column);
+    });
+    
+  
+    const townSquarePlatform = drawTownSquare(props.world, meshRef.current);
+    structuresRef.current =  structuresRef.current.concat(townSquarePlatform);
+
+    structuresRef.current.forEach((thing) => sceneRef.current!.add(thing));
+  }
+
+  const drawStructureFlares = () => {
     if (!sceneRef.current || !props.world || !meshRef.current) return;
-    if (props.displayParams.showStructureFlares) {
-      const [townSquare, temple, docks] = drawTownLocations(props.world!, meshRef.current!);
+    const [townSquare, temple, docks] = drawTownLocations(props.world!, meshRef.current!);
       flaresRef.current = [townSquare, temple, docks];
       sceneRef.current.add(townSquare);
       sceneRef.current.add(temple);
       sceneRef.current.add(docks);
-    } else {
-      flaresRef.current!.forEach((thing) => {sceneRef.current!.remove(thing);})
+  };
+
+  const drawPrecipitationDiagram = () => {
+    if (!sceneRef.current || !props.world) return;
+    precipitationRef.current = createPrecipitationField(props.world.precipitation);
+    sceneRef.current.add(precipitationRef.current);
+  }
+
+  const drawFlowDiagram = () => {
+    if (!sceneRef.current || !props.world || !meshRef.current) return;
+    arrowsRef.current = createFlowDiagram(props.world.flowDirections);
+    sceneRef.current.add(arrowsRef.current);
+  };
+
+  useEffect(() =>{
+    if (props.displayParams.drawTerrain) {
+      drawTerrain();
+    } else if (meshRef.current) {
+      sceneRef.current!.remove(meshRef.current);
+    }
+  }, [props.displayParams.drawTerrain])
+
+  useEffect(() =>{
+    if (props.displayParams.drawStructures) {
+      drawStructures();
+    } else if (structuresRef.current) {
+      structuresRef.current.forEach((thing) => sceneRef.current!.remove(thing));
+    }
+  }, [props.displayParams.drawStructures])
+  
+  useEffect(() =>{
+    if (props.displayParams.showStructureFlares) {
+      drawStructureFlares();
+    } else if (flaresRef.current) {
+      flaresRef.current.forEach((thing) => {sceneRef.current!.remove(thing);})
     }
   }, [props.displayParams.showStructureFlares])
+
+
+  useEffect(() =>{
+    if (props.displayParams.showFlowDirections) {
+      drawFlowDiagram();
+    } else if (arrowsRef.current) {
+      sceneRef.current!.remove(arrowsRef.current);
+    }
+  }, [props.displayParams.showFlowDirections])
+
+  useEffect(() =>{
+    if (props.displayParams.showWaterAccumulation) {
+      drawPrecipitationDiagram();
+    } else if (precipitationRef.current) {
+      sceneRef.current!.remove(precipitationRef.current);
+    }
+  }, [props.displayParams.showWaterAccumulation])
 
   useEffect(() => {
     const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
@@ -216,23 +296,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     // Reset the clock and the camera
     clockRef.current = new THREE.Clock();
     
+    // Refresh array refs
+    structuresRef.current = [];
 
-    if (props.world.heightmap && sceneRef.current) {
-      console.log(colorConfigRef.current);
-      const mesh = generateMesh(props.world, colorConfigRef.current);
-      meshRef.current = mesh;
-
-      sceneRef.current.add(mesh);
-
-      const [platform, columns] = drawTemple(props.world, mesh, 12);
-      sceneRef.current.add(platform);
-      columns.forEach(column => {
-        sceneRef.current!.add(column);  
-      });
-      
-    
-      const townSquarePlatform = drawTownSquare(props.world, mesh);
-      sceneRef.current.add(townSquarePlatform);
+    if (sceneRef.current) {
+      if (props.displayParams.drawTerrain) drawTerrain();
+      if (props.displayParams.drawStructures) drawStructures();
+      if (props.displayParams.showStructureFlares) drawStructureFlares();
+      if (props.displayParams.showFlowDirections) drawFlowDiagram();
+      if (props.displayParams.showWaterAccumulation) drawPrecipitationDiagram();
       
 
       if (ambientLightRef.current) {
@@ -349,7 +421,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
                 onClick={() => {
                   freeFloatControlsRef.current!.enabled = false;
                   cameraModeRef.current = CameraMode.FreeFall;
-                  console.log("Free fall");
                 }}>
                 🪂
               </Button>

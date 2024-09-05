@@ -18,3 +18,14 @@ export const DEFAULT_FOV = 75;
 export const DEFAULT_ASPECT = 1.5;
 export const DEFAULT_NEAR = 0.1;
 export const DEFAULT_FAR = 1000;
+
+// 1   2   3
+//   ↖ ↑ ↗
+// 8 ←   → 4
+//   ↙ ↓ ↘
+// 7   6   5
+export const DIRECTION_OFFSETS = [
+    [-1, -1], [0, -1], [1, -1],  // 1, 2, 3 (top row)
+    [1, 0], [1, 1], [0, 1],     // 4, 5, 6 (right side and bottom row)
+    [-1, 1], [-1, 0]            // 7, 8 (left side)
+  ];
