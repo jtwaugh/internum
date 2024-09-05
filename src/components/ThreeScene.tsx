@@ -14,7 +14,7 @@ import {
   drawTownSquare,
   generateMesh, 
   createFlowDiagram, 
-  createPrecipitationField 
+  createWaterAccumulationField 
 } from '@/app/models';
 
 export interface ThreeSceneProps {
@@ -66,7 +66,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const flaresRef = useRef<THREE.Mesh[]>([]);
   const structuresRef = useRef<THREE.Mesh[]>([]);
   const arrowsRef = useRef<THREE.Group | null>(null);
-  const precipitationRef = useRef<THREE.Group | null>(null);
+  const waterAccumulationRef = useRef<THREE.Group | null>(null);
 
 
   const resetCamera = () => {
@@ -215,10 +215,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       sceneRef.current.add(docks);
   };
 
-  const drawPrecipitationDiagram = () => {
+  const drawWaterAccumulationDiagram = () => {
     if (!sceneRef.current || !props.world) return;
-    precipitationRef.current = createPrecipitationField(props.world.precipitation);
-    sceneRef.current.add(precipitationRef.current);
+    waterAccumulationRef.current = createWaterAccumulationField(props.world.waterAccumulation);
+    sceneRef.current.add(waterAccumulationRef.current);
   }
 
   const drawFlowDiagram = () => {
@@ -262,9 +262,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   useEffect(() =>{
     if (props.displayParams.showWaterAccumulation) {
-      drawPrecipitationDiagram();
-    } else if (precipitationRef.current) {
-      sceneRef.current!.remove(precipitationRef.current);
+      drawWaterAccumulationDiagram();
+    } else if (waterAccumulationRef.current) {
+      sceneRef.current!.remove(waterAccumulationRef.current);
     }
   }, [props.displayParams.showWaterAccumulation])
 
@@ -304,7 +304,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       if (props.displayParams.drawStructures) drawStructures();
       if (props.displayParams.showStructureFlares) drawStructureFlares();
       if (props.displayParams.showFlowDirections) drawFlowDiagram();
-      if (props.displayParams.showWaterAccumulation) drawPrecipitationDiagram();
+      if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
       
 
       if (ambientLightRef.current) {

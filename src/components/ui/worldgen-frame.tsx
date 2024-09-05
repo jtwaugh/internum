@@ -126,7 +126,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     // const testFlowDirections2 = computeFlowDirection(blurredHeightmap, params);
 
     const flowDirections = computeFlowDirection(blurredHeightmap);
-    const precipitation = accumulateWater(flowDirections, blurredHeightmap);
+    const waterAccumulation = accumulateWater(flowDirections, blurredHeightmap);
     const townSquarePosition = getRandomLandTile(blurredHeightmap, params);
     const templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, Constants.TEMPLE_MIN_RADIUS, Constants.TEMPLE_MAX_RADIUS);
     const docksPosition = findClosestWaterBorder(blurredHeightmap, townSquarePosition, params);
@@ -139,7 +139,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       {
         heightmap: blurredHeightmap, 
         flowDirections: flowDirections, 
-        precipitation: precipitation, 
+        waterAccumulation: waterAccumulation, 
         townSquare: townSquarePosition, 
         temple: templePosition, 
         docks: docksPosition
