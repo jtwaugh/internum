@@ -18,7 +18,11 @@ const generateHeightmap = (p: p5, params: WorldGenParams): number[][] => {
       let islandShape = noiseVal - normalizedDistance;
       islandShape = p.constrain(islandShape, 0, 1);
 
-      heightmap[x][y] = islandShape < params.threshold ? 0 : islandShape;
+      heightmap[x][y] = islandShape;
+
+      if (islandShape > 0.0001 && islandShape < params.threshold) {
+        heightmap[x][y] = 0;
+      }
     }
   }
 
@@ -116,7 +120,7 @@ export const erodeHeightmap = (heightmap: HeightMap, flowDirection: SlopeMap, wa
       // Erode this tile if it has water accumulation above the threshold
       if (waterAccumulation[x][y] > 0) {
         const erosionAmount = (params.erosionRate * 0.0005) * waterAccumulation[x][y];
-        newHeightmap[x][y] = Math.max(0, heightmap[x][y] - erosionAmount);
+        newHeightmap[x][y] = heightmap[x][y] - erosionAmount;
         // console.log("Eroded ", erosionAmount, " at (", x, ", ", y, ")");
         // TODO take it downhill and lift up some beach
         // let next = {x: x, y: y};
@@ -136,6 +140,8 @@ export const erodeHeightmap = (heightmap: HeightMap, flowDirection: SlopeMap, wa
       }
     }
 
+
+  //console.log(newHeightmap);  
   return newHeightmap;
 }
 
@@ -259,7 +265,7 @@ export const generateWorldTerrain = (params: WorldGenParams): HeightMap => {
 // 8 ←   → 4
 //   ↙ ↓ ↘
 // 7   6   5
-export const computeFlowDirection = (heightmap: HeightMap, oceanTiles: MapMask): (number | null)[][] => {
+export const computeFlowDirection = (heightmap: HeightMap, params: WorldGenParams): (number | null)[][] => {
   // New params
   const slopeTolerance = 0.000001;
   
@@ -269,7 +275,7 @@ export const computeFlowDirection = (heightmap: HeightMap, oceanTiles: MapMask):
 
   for (let x = 0; x < height; x++) {
     for (let y = 0; y < width; y++) {
-      if (oceanTiles[x][y]) continue; // Skip non-land tiles
+      if (heightmap[x][y] < params.threshold) continue; // Skip non-land tiles
 
       let maxSlope = -Infinity;
       let bestDirectionIndex: number | null = null;
@@ -284,7 +290,7 @@ export const computeFlowDirection = (heightmap: HeightMap, oceanTiles: MapMask):
         // Ensure neighbor is within bounds
         if (nx >= 0 && nx < height && ny >= 0 && ny < width) {
           // Prioritize going into the sea
-          const slope = (oceanTiles[nx][ny] ? 1 : heightmap[x][y] - heightmap[nx][ny]);
+          const slope = (heightmap[nx][ny] < params.threshold ? 1 : heightmap[x][y] - heightmap[nx][ny]);
           //console.log("Slope from (", x, ", ", y, ") to (", nx, ", ", ny, "): ", slope);
 
 

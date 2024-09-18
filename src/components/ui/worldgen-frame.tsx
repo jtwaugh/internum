@@ -24,7 +24,7 @@ import {
 import { World, ColorsConfig, WorldGenParams } from '@/types';
 import GradientBuilder from './gradient-builder';
 import { ColorHexInput } from './color-hex-input';
-import { generateWorldTerrain, getRandomLandTile, findHighestPoint, findClosestWaterBorder, accumulateWater, computeFlowDirection, floodFillOcean, erodeHeightmap } from '@/world-gen';
+import { generateWorldTerrain, getRandomLandTile, findHighestPoint, accumulateWater, computeFlowDirection, floodFillOcean, erodeHeightmap } from '@/world-gen';
 
 
 interface IslandGeneratorProps {
@@ -39,6 +39,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
   const [noiseScale, setNoiseScale] = useState(props.params.noiseScale);
   const [canvasSize, setCanvasSize] = useState(props.params.canvasSize);
   const [threshold, setThreshold] = useState(props.params.threshold);
+  const [waterLevel, setWaterLevel] = useState(props.params.waterLevel);
   const [maxDistanceFactor, setMaxDistanceFactor] = useState(props.params.maxDistanceFactor);
   const [blurIterations, setBlurIterations] = useState(props.params.blurIterations);
   const [erosionRate, setErosionRate] = useState(props.params.erosionRate);
@@ -47,6 +48,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
   const [gradient, setGradient] = useState(Constants.DEFAULT_GRADIENT);
   const [ambientLightColor, setAmbientLightColor] = useState(Constants.DEFAULT_AMBIENT_LIGHT_COLOR);
   const [directionalLightColor, setDirectionalLightColor] = useState(Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR);
+  const [waterColor, setWaterColor] = useState(Constants.DEFAULT_WATER_COLOR);
 
   const [paramsButtonRef, paramsButtonWidth] = useElementWidth<HTMLButtonElement>();
   const [colorsButtonRef, colorsButtonWidth] = useElementWidth<HTMLButtonElement>();
@@ -57,10 +59,11 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       {
         terrainGradient: gradient, 
         ambientLight: ambientLightColor, 
-        directionalLight: directionalLightColor
+        directionalLight: directionalLightColor,
+        waterColor: waterColor
       }
     );
-  }, [gradient, ambientLightColor, directionalLightColor]);
+  }, [gradient, ambientLightColor, directionalLightColor, waterColor]);
 
   useEffect(() => {
     props.onParamsChanged(
@@ -68,6 +71,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
         noiseScale: noiseScale,
         canvasSize: canvasSize,
         threshold: threshold,
+        waterLevel: waterLevel,
         maxDistanceFactor: maxDistanceFactor,
         blurIterations: blurIterations,
         erosionRate: erosionRate,
@@ -90,6 +94,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       noiseScale: noiseScale,
       canvasSize: canvasSize,
       threshold: threshold,
+      waterLevel: waterLevel,
       maxDistanceFactor: maxDistanceFactor,
       blurIterations: blurIterations,
       erosionRate: erosionRate,
@@ -102,14 +107,14 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
 
     let currentHeightmap = blurredHeightmap;
 
-    let flowDirections = computeFlowDirection(currentHeightmap, oceanTiles);
+    let flowDirections = computeFlowDirection(currentHeightmap, params);
     let waterAccumulation = accumulateWater(flowDirections, currentHeightmap);
     let erodedHeightmap = erodeHeightmap(currentHeightmap, flowDirections, waterAccumulation, params);
 
     if (params.erosionIterations > 1) {
       for (let i = 0; i < params.erosionIterations; i++) {
         currentHeightmap = erodedHeightmap;
-        flowDirections = computeFlowDirection(currentHeightmap, oceanTiles);
+        flowDirections = computeFlowDirection(currentHeightmap, params);
         waterAccumulation = accumulateWater(flowDirections, currentHeightmap);
         erodedHeightmap = erodeHeightmap(currentHeightmap, flowDirections, waterAccumulation, params);
       }
@@ -139,8 +144,8 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     }
 
     if (templePath) {
-      // console.log("path to temple: ", templePath);
-      // console.log("temple coords: ", templePath[templePath?.length - 1]);
+      console.log("path to temple: ", templePath);
+      console.log("temple coords: ", templePath[templePath?.length - 1]);
     }
 
     //console.log("Starting to try docks");
@@ -153,8 +158,8 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     }
 
     if (docksPath) {
-      // console.log("path to docks: ", docksPath);
-      // console.log("docks coords: ", docksPath[docksPath?.length - 1]);
+      console.log("path to docks: ", docksPath);
+      console.log("docks coords: ", docksPath[docksPath?.length - 1]);
     }
 
     // const townSquarePosition = {x: 0, y: 0};
@@ -166,6 +171,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     props.onWorldGenerated(
       {
         heightmap: erodedHeightmap, 
+        waterLevel: params.waterLevel,
         oceanTiles: oceanTiles,
         flowDirections: flowDirections, 
         waterAccumulation: waterAccumulation, 
@@ -252,6 +258,19 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
             </div>
             <div>
               <label>
+              <span className='p-2 font-bold text-xs'>Water level: {waterLevel}</span>
+                <Slider
+                  className='p-2'
+                  min={0.0}
+                  max={1.0}
+                  step={0.05}
+                  value={[waterLevel]}
+                  onValueChange={(values) => setWaterLevel(values[0])}
+                />
+              </label>
+            </div>
+            <div>
+              <label>
               <span className='p-2 font-bold text-xs'>Blur Iterations: {blurIterations}</span>
                 <Slider
                   className='p-2'
@@ -302,6 +321,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
           <TabsContent value="colors" className='flex-1 bg-slate-50 border rounded-md p-2'>
             <ColorHexInput text="Ambient Light" value={ambientLightColor} placeholder={Constants.DEFAULT_AMBIENT_LIGHT_COLOR} onChange={setAmbientLightColor}></ColorHexInput>
             <ColorHexInput text="Directional Light" value={directionalLightColor} placeholder={Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR} onChange={setDirectionalLightColor}></ColorHexInput>
+            <ColorHexInput text="Water Color" value={waterColor} placeholder={Constants.DEFAULT_WATER_COLOR} onChange={setWaterColor}></ColorHexInput>
 
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="item-1">

@@ -54,7 +54,8 @@ export default function Home() {
     {
       terrainGradient: Constants.DEFAULT_GRADIENT, 
       ambientLight: Constants.DEFAULT_AMBIENT_LIGHT_COLOR, 
-      directionalLight: Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR
+      directionalLight: Constants.DEFAULT_DIRECTIONAL_LIGHT_COLOR,
+      waterColor: Constants.DEFAULT_WATER_COLOR,
     }
   );
   const [currentParams, setCurrentParams] = useState<WorldGenParams>(
@@ -62,6 +63,7 @@ export default function Home() {
       noiseScale: Constants.DEFAULT_NOISE_SCALE,
         canvasSize: Constants.DEFAULT_CANVAS_SIZE,
         threshold: Constants.DEFAULT_THRESHOLD,
+        waterLevel: Constants.DEFAULT_WATER_LEVEL,
         maxDistanceFactor: Constants.DEFAULT_MAX_DISTANCE_FACTOR,
         blurIterations: Constants.DEFAULT_BLUR_ITERATIONS,
         erosionRate: Constants.DEFAULT_EROSION_RATE,
@@ -71,12 +73,13 @@ export default function Home() {
   const [currentDisplayParams, setCurrentDisplayParams] = useState<DisplayParams>(
     {
       drawTerrain: true,
+      drawWater: true,
       drawStructures: true,
       drawRoads: true,
       showStructureFlares: false,
       showWaterAccumulation: false,
       showFlowDirections: false,
-      showTrees: false,
+      showTrees: true,
     }
   )
 
@@ -223,7 +226,20 @@ export default function Home() {
                         setCurrentDisplayParams(newParams);
                     }}
                   />
-                  <Label htmlFor='show-structure-flares' className='px-2'>Show terrain</Label>
+                  <Label htmlFor='show-terrain' className='px-2'>Show terrain</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.drawTerrain}
+                    id='show-water-level' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, drawWater: !currentDisplayParams.drawWater};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-water-level' className='px-2'>Show water</Label>
                 </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 

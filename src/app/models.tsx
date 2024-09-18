@@ -3,6 +3,18 @@ import * as THREE from 'three';
 import { ColorsConfig, World, Point, HeightMap, WaterAccumulationMap } from '@/types';
 import { MESH_THICKNESS, DIRECTION_OFFSETS } from '@/constants';
 
+export const intersectPlane = (position: THREE.Vector3, planeMesh: THREE.Mesh): THREE.Intersection[] => {
+  const down = new THREE.Vector3(0, 0, -1);
+  const raycaster = new THREE.Raycaster();
+
+  raycaster.set(position, down);
+
+  // Check for intersections with the plane mesh
+  const intersects = raycaster.intersectObject(planeMesh);
+
+  // If no intersection is found, return null or some default value
+  return intersects;
+}
 
 const createThickLine = (start: THREE.Vector3, end: THREE.Vector3, color: number): THREE.Mesh => {
     const height = start.distanceTo(end);
@@ -206,13 +218,49 @@ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
     geometry.attributes.position.setZ(i / 3, world.heightmap[x][y] * 10); // Adjust multiplier for height scaling
 
     let color;
-    if (world.heightmap[x][y] < 0.001) { // || world.waterAccumulation[x][y] / scaler > displayThreshold
-      color = new THREE.Color(colorsConfig.terrainGradient[0]);
-    } else if (world.heightmap[x][y] < 0.5) {
-      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * 2));
+    if (world.heightmap[x][y] < 0.2) { // || world.waterAccumulation[x][y] / scaler > displayThreshold
+      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[0], colorsConfig.terrainGradient[1], world.heightmap[x][y] * (1 / 0.2)));
+    } else if (world.heightmap[x][y] < 0.3) {
+      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * (1 / 0.3)));
     } else {
-      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.5) * 2));
+      color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[2], colorsConfig.terrainGradient[3], (world.heightmap[x][y] - 0.3) * (1 / 0.7)));
     }
+
+    colors.push(color.r, color.g, color.b);
+  }
+
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
+
+  const retMesh = new THREE.Mesh(geometry, material);
+
+  return retMesh;
+};
+
+export const generateWaterMesh = (waterLevel: number, canvasSize: number, colorsConfig: ColorsConfig) => {
+  const geometry = new THREE.PlaneGeometry(
+    canvasSize,
+    canvasSize,
+    canvasSize - 1,
+    canvasSize - 1
+  );
+
+  let colors = [];
+
+  for (let i = 0; i < geometry.attributes.position.array.length; i += 3) {
+    const x = Math.floor((i / 3) % canvasSize);
+    const y = Math.floor(i / 3 / canvasSize);
+
+    // Set the Z value (height) from the heightmap
+    geometry.attributes.position.setZ(i / 3, waterLevel * 10); // Adjust multiplier for height scaling
+
+    // Water color
+    let color = new THREE.Color(colorsConfig.waterColor);
 
     colors.push(color.r, color.g, color.b);
   }
@@ -317,18 +365,14 @@ export const createPath = (points: Point[], heightmap: HeightMap) => {
   return new THREE.Line(geometry, material);
 }
 
-export const drawTree = (treeCoords: Point, heightmap: HeightMap, waterFraction: number) => {
+export const drawTree = (treeCoords: Point, basePosition: THREE.Vector3, waterFraction: number) => {
   let ret = new THREE.Group();
-
-  const treeBaseHeight = heightmap[treeCoords.x][treeCoords.y] * 10 + 0.6 + 0.4 * waterFraction;
-  const treeBaseX = Math.random() + treeCoords.x  - heightmap.length / 2;
-  const treeBaseY = Math.random() + (heightmap.length - treeCoords.y) - heightmap.length / 2
 
   // Create the tree trunk
   const trunkGeometry = new THREE.CylinderGeometry(0.02 + 0.05 * waterFraction, 0.03 + 0.05 * waterFraction, 0.5, 6); // Cylinder (trunk) with a hexagonal base
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown color for the trunk
   const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-  trunk.position.set(treeBaseX, treeBaseY, treeBaseHeight); // Raise the trunk above the ground
+  trunk.position.set(basePosition.x, basePosition.y, basePosition.z); // Raise the trunk above the ground
   trunk.rotation.x = -Math.PI / 2;
   ret.add(trunk);
 
@@ -346,15 +390,16 @@ export const drawTree = (treeCoords: Point, heightmap: HeightMap, waterFraction:
   foliageGeometries.forEach((geometry, index) => {
       const foliage = new THREE.Mesh(geometry, foliageMaterial);
       foliage.rotation.x = Math.PI / 2;
-      foliage.position.set(treeBaseX, treeBaseY, treeBaseHeight + foliagePositions[index]); // Position each cone above the trunk
+      foliage.position.set(basePosition.x, basePosition.y, basePosition.z + foliagePositions[index]); // Position each cone above the trunk
       ret.add(foliage);
   });
 
   return ret;
 }
 
-export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightmap: HeightMap): THREE.Group[] => {
+export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightmap: HeightMap, waterLevel: number, mesh: THREE.Mesh): THREE.Group[] => {
   const size = heightmap.length;
+  const SKY_HEIGHT = 9001;
   let ret: THREE.Group[] = [];
 
   let scaler = 0;
@@ -367,14 +412,23 @@ export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightma
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
-      if (heightmap[x][y] < 0.0001) continue;
+      if (heightmap[x][y] < waterLevel) continue;
 
       const waterFraction = Math.log(waterAccumulation[x][y] / scaler * (scaler - 1) + 1) / Math.log(scaler);
 
       if (waterFraction > 0.3) {
-        ret = ret.concat(drawTree({x: x, y: y}, heightmap, waterFraction));
-        console.log("Added tree at (", x, ", ", y, ")");
-        console.log("ret = ", ret);
+        const treeBaseX = Math.random() + x  - heightmap.length / 2;
+        const treeBaseY = Math.random() + (heightmap.length - y) - heightmap.length / 2
+
+        const groundCollision = intersectPlane(new THREE.Vector3(treeBaseX, treeBaseY, SKY_HEIGHT), mesh);
+
+        if (groundCollision.length !== 1) continue;
+
+        const treeBaseHeight = groundCollision[0].point.z;
+
+        if (treeBaseHeight < waterLevel * 10) continue;
+
+        ret = ret.concat(drawTree({x: x, y: y}, new THREE.Vector3(treeBaseX, treeBaseY, treeBaseHeight), waterFraction));
       }
     }
   }

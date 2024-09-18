@@ -1,6 +1,6 @@
 "use client"
 
-import React, { KeyboardEvent, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
@@ -14,11 +14,13 @@ import {
   drawTownLocations, 
   drawTownSquare,
   generateMesh, 
+  generateWaterMesh,
   createFlowDiagram, 
   createWaterAccumulationField,
   createPath,
   drawDocks,
-  drawTreesOnMap
+  drawTreesOnMap,
+  intersectPlane
 } from '@/app/models';
 
 export interface ThreeSceneProps {
@@ -55,7 +57,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const clockRef = useRef<THREE.Clock | null>(null); 
   
   // Pointer to terrain mesh
-  const meshRef = useRef<THREE.Mesh | null>(null);
+  const terrainMeshRef = useRef<THREE.Mesh | null>(null);
+  const waterMeshRef = useRef<THREE.Mesh | null>(null);
   
   // Camera
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -153,13 +156,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     const pointerLockControls = new FPSControls(camera, renderer.domElement);
     pointerLockControlsRef.current = pointerLockControls;
 
-    // Event listener to lock pointer when user clicks on the canvas
-    renderer.domElement.addEventListener('click', () => {
-      if (controlsRef.current instanceof FPSControls) {
-        pointerLockControls.lock();
-      }
-    });
-
     // Handle pointer lock state changes (optional but useful for UI)
     pointerLockControls.domElement.ownerDocument.addEventListener('lock', () => {
       console.log('Pointer locked');
@@ -201,6 +197,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         }
         freeFloatControlsRef.current!.update();
       } else if (controlsRef.current instanceof FPSControls) {
+        // Event listener to lock pointer when user clicks on the canvas
         console.log("Pointer lock movement");
         switch (event.key) {
           case 'w':
@@ -264,17 +261,25 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   const drawTerrain = () => {
     if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
-    const mesh = generateMesh(props.world, colorConfigRef.current);
-    meshRef.current = mesh;
+    const terrainMesh = generateMesh(props.world, colorConfigRef.current);
+    terrainMeshRef.current = terrainMesh;
 
-    sceneRef.current.add(mesh);
+    sceneRef.current.add(terrainMesh);
+  }
+
+  const drawWaterLevel = () => {
+    if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
+    const waterMesh = generateWaterMesh(props.world.waterLevel, props.world.heightmap.length, colorConfigRef.current);
+    waterMeshRef.current = waterMesh;
+
+    sceneRef.current.add(waterMesh);
   }
 
   const drawStructures = () => {
-    if (!meshRef.current || !props.world || !sceneRef.current || !structuresRef.current) return;
+    if (!terrainMeshRef.current || !props.world || !sceneRef.current || !structuresRef.current) return;
     
     if (props.world.temple) {
-      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, meshRef.current, 12);
+      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, terrainMeshRef.current, 12);
       structuresRef.current = structuresRef.current.concat(platform);
       columns.forEach(column => {
         structuresRef.current = structuresRef.current!.concat(column);
@@ -282,11 +287,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     }
 
     if (props.world.docks) {
-      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, meshRef.current);
+      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, terrainMeshRef.current);
       structuresRef.current = structuresRef.current.concat(docksPlatform);
     }
   
-    const townSquarePlatform = drawTownSquare(props.world, meshRef.current);
+    const townSquarePlatform = drawTownSquare(props.world, terrainMeshRef.current);
     structuresRef.current = structuresRef.current.concat(townSquarePlatform);
 
     structuresRef.current.forEach((thing) => sceneRef.current!.add(thing));
@@ -309,8 +314,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }
 
   const drawStructureFlares = () => {
-    if (!sceneRef.current || !props.world || !meshRef.current) return;
-    const [townSquare, temple, docks] = drawTownLocations(props.world!, meshRef.current!);
+    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
+    const [townSquare, temple, docks] = drawTownLocations(props.world!, terrainMeshRef.current!);
       flaresRef.current = [townSquare, temple, docks];
       if (townSquare) {
         sceneRef.current.add(townSquare);
@@ -330,13 +335,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }
 
   const drawTrees = () => {
-    if (!sceneRef.current || !props.world) return;
-    treesGroupsRef.current = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap);
+    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
+    treesGroupsRef.current = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap, props.world.waterLevel, terrainMeshRef.current!);
     treesGroupsRef.current.forEach((treeGroup) => sceneRef.current!.add(treeGroup));
   }
 
   const drawFlowDiagram = () => {
-    if (!sceneRef.current || !props.world || !meshRef.current) return;
+    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
     arrowsRef.current = createFlowDiagram(props.world.flowDirections);
     sceneRef.current.add(arrowsRef.current);
   };
@@ -344,10 +349,18 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   useEffect(() =>{
     if (props.displayParams.drawTerrain) {
       drawTerrain();
-    } else if (meshRef.current) {
-      sceneRef.current!.remove(meshRef.current);
+    } else if (terrainMeshRef.current) {
+      sceneRef.current!.remove(terrainMeshRef.current);
     }
   }, [props.displayParams.drawTerrain])
+
+  useEffect(() =>{
+    if (props.displayParams.drawWater) {
+      drawTerrain();
+    } else if (waterMeshRef.current) {
+      sceneRef.current!.remove(waterMeshRef.current);
+    }
+  }, [props.displayParams.drawWater])
 
   useEffect(() =>{
     if (props.displayParams.drawStructures) {
@@ -432,6 +445,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     if (sceneRef.current) {
       if (props.displayParams.drawTerrain) drawTerrain();
+      if (props.displayParams.drawWater) drawWaterLevel();
       if (props.displayParams.drawStructures) drawStructures();
       if (props.displayParams.drawRoads) drawRoads();
       if (props.displayParams.showStructureFlares) drawStructureFlares();
@@ -462,12 +476,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         fallSpeedRef.current += gravity * delta; // Increase fall speed due to gravity
         cameraRef.current!.position.z -= fallSpeedRef.current * delta; // Move camera downwards
 
-        // Check if the camera has hit the terrain
-        const down = new THREE.Vector3(0, 0, -1);
-        const raycaster = new THREE.Raycaster();
-
-        raycaster.set(cameraRef.current!.position, down);
-        const collisionResults = raycaster.intersectObject(meshRef.current!);
+        const collisionResults = intersectPlane(cameraRef.current!.position, terrainMeshRef.current!);
 
         if (collisionResults.length > 0) {
           if (collisionResults[0].distance <= fallSpeedRef.current * delta) {
@@ -531,16 +540,22 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       freeFloatControlsRef.current!.reset();
       freeFloatControlsRef.current!.enabled = true;
       controlsRef.current = freeFloatControlsRef.current!;
+
+      rendererRef.current!.domElement.removeEventListener('click', () => {
+        if (controlsRef.current instanceof FPSControls) {
+          pointerLockControlsRef.current!.lock();
+        }
+      });
     }
   };
 
   // Function to move the camera directly above the town square
   const moveCameraAboveTownSquare = () => {
-    if (!cameraRef.current || !controlsRef.current || !props.world || !meshRef.current) return;
+    if (!cameraRef.current || !controlsRef.current || !props.world || !terrainMeshRef.current) return;
 
     const townSquarePosition = new THREE.Vector3(
-      props.world!.townSquare.x - (meshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
-      (props.world.heightmap.length - props.world!.townSquare.y) - (meshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
+      props.world!.townSquare.x - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
+      (props.world.heightmap.length - props.world!.townSquare.y) - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
       10 // Z position above the ground
     );
     cameraModeRef.current = CameraMode.FreeFloat;
@@ -549,6 +564,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     freeFloatControlsRef.current!.target.copy(townSquarePosition); // Set the controls' target to the town square
     freeFloatControlsRef.current!.update();
     freeFloatControlsRef.current!.enabled = true;
+
+    rendererRef.current!.domElement.removeEventListener('click', () => {
+      if (controlsRef.current instanceof FPSControls) {
+        pointerLockControlsRef.current!.lock();
+      }
+    });
   };
 
   const onFullscreenClick = () => {
@@ -605,6 +626,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
                 onClick={() => {
                   freeFloatControlsRef.current!.enabled = false;
+                  rendererRef.current!.domElement.addEventListener('click', () => {
+                    if (controlsRef.current instanceof FPSControls) {
+                      pointerLockControlsRef.current!.lock();
+                    }
+                  });
                   cameraModeRef.current = CameraMode.Walking;
                   controlsRef.current = pointerLockControlsRef.current;
                 }}>
