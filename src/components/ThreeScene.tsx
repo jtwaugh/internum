@@ -1,13 +1,14 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-import { OrbitControls, PointerLockControls } from 'three/examples/jsm/Addons.js';
+import { OrbitControls } from 'three/examples/jsm/Addons.js';
+import { FPSControls } from '@/FPSControls.js';
 import { Button } from './ui/button';
 
 import * as Constants from '@/constants';
-import { ColorsConfig, DisplayParams, World } from '@/types';
+import { ColorsConfig, DisplayParams, Point, World } from '@/types';
 import { 
   drawTemple, 
   drawTownLocations, 
@@ -38,6 +39,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const fullscreenButton = document.getElementById('fullscreen-btn');
+  const [cameraModeString, setCameraModeString] = useState<string>("Free Float");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -59,9 +61,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   // Camera controls
-  const controlsRef = useRef<OrbitControls | PointerLockControls | null>(null);
+  const controlsRef = useRef<OrbitControls | FPSControls | null>(null);
   const freeFloatControlsRef = useRef<OrbitControls | null>(null);
-  const pointerLockControlsRef = useRef<PointerLockControls | null>(null);
+  const pointerLockControlsRef = useRef<FPSControls | null>(null);
 
   const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
@@ -86,7 +88,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   // Physics for free-fall
   const fallSpeedRef = useRef(0); // Use ref to persist fall speed across renders
   const gravity = 9.81; // Simulating gravity
-  
+
+  // Input state
+  const moveForward = useRef<boolean>(false);
+  const moveBackward = useRef<boolean>(false);
+  const moveLeft = useRef<boolean>(false);
+  const moveRight = useRef<boolean>(false);
+  const canJumpRef = useRef<boolean>(false);
+  const velocityRef = useRef<THREE.Vector3>(new THREE.Vector3());
+  const directionRef = useRef<THREE.Vector3>(new THREE.Vector3());
 
   const resizeRendererToDisplaySize = () => {
     const width = mountRef.current?.clientWidth;
@@ -139,6 +149,25 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     orbitControls.dampingFactor = 0.05;
     freeFloatControlsRef.current = orbitControls;
 
+    // Constructor: PointerLockControls setup
+    const pointerLockControls = new FPSControls(camera, renderer.domElement);
+    pointerLockControlsRef.current = pointerLockControls;
+
+    // Event listener to lock pointer when user clicks on the canvas
+    renderer.domElement.addEventListener('click', () => {
+      if (controlsRef.current instanceof FPSControls) {
+        pointerLockControls.lock();
+      }
+    });
+
+    // Handle pointer lock state changes (optional but useful for UI)
+    pointerLockControls.domElement.ownerDocument.addEventListener('lock', () => {
+      console.log('Pointer locked');
+    });
+    pointerLockControls.domElement.ownerDocument.addEventListener('unlock', () => {
+      console.log('Pointer unlocked');
+    });
+
     // Constructor: KeyEvents setup
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!cameraRef.current || !controlsRef.current) return;
@@ -147,6 +176,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
       // If we're in free-float mode
       if (controlsRef.current instanceof OrbitControls) {
+        console.log("Orbit lock movement");
         switch (event.key) {
           case 'w':
             let north = new THREE.Vector3(0, 1, 0);
@@ -169,12 +199,55 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
             cameraRef.current.position.addScaledVector(east, moveSpeed);
             break;
         }
-      } 
-      freeFloatControlsRef.current!.update();
+        freeFloatControlsRef.current!.update();
+      } else if (controlsRef.current instanceof FPSControls) {
+        console.log("Pointer lock movement");
+        switch (event.key) {
+          case 'w':
+            velocityRef.current.y = moveSpeed; // Move forward
+            break;
+          case 's':
+            velocityRef.current.y = -moveSpeed; // Move backward
+            break;
+          case 'a':
+            velocityRef.current.x = -moveSpeed; // Move left
+            break;
+          case 'd':
+            velocityRef.current.x = moveSpeed; // Move right
+            break;
+          case 'Space':
+            if (cameraRef.current.position.z <= 10) {
+              velocityRef.current.z = moveSpeed * 2; // Jump logic (adjust as necessary)
+            }
+            break;
+        }
+      }
+      
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!controlsRef.current) return;
+    
+      // Reset velocity when key is released
+      switch (event.key) {
+        case 'w':
+        case 's':
+          velocityRef.current.y = 0;
+          break;
+        case 'a':
+        case 'd':
+          velocityRef.current.x = 0;
+          break;
+        case 'Space':
+          velocityRef.current.z = 0; // Reset vertical velocity after jump
+          break;
+      }
     };
 
     
     window.addEventListener('resize', resizeRendererToDisplaySize);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     // Game logic: Initialize to free-float mode
     controlsRef.current = orbitControls;
@@ -183,6 +256,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     // Return cleanup callback
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       mountRef.current?.removeChild(renderer.domElement);
       rendererRef.current!.dispose();
     };
@@ -374,7 +448,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         sceneRef.current.add(directionalLightRef.current);
       }
     }
-    
+
     let animationId: number;
 
     const animate = () => {
@@ -384,6 +458,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
       // Update the camera's fall if in free-fall mode
       if (cameraModeRef.current === CameraMode.FreeFall) {
+        setCameraModeString("Free Fall")
         fallSpeedRef.current += gravity * delta; // Increase fall speed due to gravity
         cameraRef.current!.position.z -= fallSpeedRef.current * delta; // Move camera downwards
 
@@ -398,12 +473,44 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
           if (collisionResults[0].distance <= fallSpeedRef.current * delta) {
             cameraRef.current!.position.z = 5;
             cameraRef.current!.lookAt(new THREE.Vector3(1, 0, 0));
+            cameraRef.current!.setRotationFromEuler(new THREE.Euler(0, 0, 0, "ZYX"));
             cameraModeRef.current = CameraMode.Walking;
+            controlsRef.current = pointerLockControlsRef.current;
             fallSpeedRef.current = 0;
           }
         }
-      }
-      else {
+      } else if (cameraModeRef.current === CameraMode.Walking) {
+        setCameraModeString("Fly-Hack");
+        const moveSpeed = 10;
+        // Apply velocity and movement for PointerLockControls
+        const velocity = velocityRef.current; // Assuming you have a velocity ref for FPS movement
+        const direction = directionRef.current; // Assuming you have a direction ref for FPS movement
+    
+        // Update velocity with delta
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.y -= velocity.y * 10.0 * delta;
+    
+        // Update movement direction based on user input (WASD keys)
+        if (moveForward.current) velocity.y += moveSpeed * delta;
+        if (moveBackward.current) velocity.y -= moveSpeed * delta;
+        if (moveLeft.current) velocity.x -= moveSpeed * delta;
+        if (moveRight.current) velocity.x += moveSpeed * delta;
+    
+        // Apply movement to the PointerLockControls
+        (controlsRef.current as FPSControls).moveRight(velocity.x * delta);
+        (controlsRef.current as FPSControls).moveForward(-1 * velocity.y * delta);
+    
+        // // Optional: Handle gravity or jumping
+        // if (cameraRef.current.position.y < 10) {
+        //   cameraRef.current.position.y = 10; // Prevent camera from going below ground level
+        //   velocity.y = 0; // Stop vertical movement
+        // }
+    
+        // // You can also add vertical movement for jumping or falling here
+        // cameraRef.current.position.y += velocity.y * delta;
+      } 
+      else if (cameraModeRef.current === CameraMode.FreeFloat) {
+        setCameraModeString("Free Float");
         freeFloatControlsRef.current!.update();
       }
       
@@ -436,9 +543,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       (props.world.heightmap.length - props.world!.townSquare.y) - (meshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
       10 // Z position above the ground
     );
+    cameraModeRef.current = CameraMode.FreeFloat;
+    controlsRef.current = freeFloatControlsRef.current;
     cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
     freeFloatControlsRef.current!.target.copy(townSquarePosition); // Set the controls' target to the town square
     freeFloatControlsRef.current!.update();
+    freeFloatControlsRef.current!.enabled = true;
   };
 
   const onFullscreenClick = () => {
@@ -464,7 +574,16 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
           </Button>
         </div>
 
+        <div id="cameramode-label-container" className='relative'>
+          <div className='flex p-4 absolute top-1 left-1 z-10'>
+            <span className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'>
+              Camera Mode: {cameraModeString}
+            </span>
+          </div>
+        </div>
+
         <div ref={mountRef} className='h-full w-full bg-primary'/>
+        
 
         <div id="buttons-container" className='relative'>
           <div className='flex p-4 absolute bottom-1 left-1 z-10'>
@@ -482,6 +601,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
                   cameraModeRef.current = CameraMode.FreeFall;
                 }}>
                 🪂
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  freeFloatControlsRef.current!.enabled = false;
+                  cameraModeRef.current = CameraMode.Walking;
+                  controlsRef.current = pointerLockControlsRef.current;
+                }}>
+                🛩️
               </Button>
           </div>
         </div>  
