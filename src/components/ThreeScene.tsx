@@ -169,7 +169,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     });
 
     // Constructor: KeyEvents setup
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (!cameraRef.current || !controlsRef.current) return;
 
       const moveSpeed = 10;
@@ -225,7 +225,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       
     };
 
-    const handleKeyUp = (event: KeyboardEvent) => {
+    const handleKeyUp = (event: globalThis.KeyboardEvent) => {
       if (!controlsRef.current) return;
     
       // Reset velocity when key is released
