@@ -14,7 +14,9 @@ import {
   drawTownSquare,
   generateMesh, 
   createFlowDiagram, 
-  createWaterAccumulationField 
+  createWaterAccumulationField,
+  createPath,
+  drawDocks
 } from '@/app/models';
 
 export interface ThreeSceneProps {
@@ -63,8 +65,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
 
   // Track refs for models that we turn on or off
-  const flaresRef = useRef<THREE.Mesh[]>([]);
+  const flaresRef = useRef<(THREE.Mesh | null)[]>([]);
   const structuresRef = useRef<THREE.Mesh[]>([]);
+  const roadsRef = useRef<THREE.Line[]>([]);
   const arrowsRef = useRef<THREE.Group | null>(null);
   const waterAccumulationRef = useRef<THREE.Group | null>(null);
 
@@ -193,31 +196,60 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   const drawStructures = () => {
     if (!meshRef.current || !props.world || !sceneRef.current || !structuresRef.current) return;
-    const [platform, columns] = drawTemple(props.world, meshRef.current, 12);
-    structuresRef.current = structuresRef.current.concat(platform);
-    columns.forEach(column => {
-      structuresRef.current = structuresRef.current!.concat(column);
-    });
     
+    if (props.world.temple) {
+      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, meshRef.current, 12);
+      structuresRef.current = structuresRef.current.concat(platform);
+      columns.forEach(column => {
+        structuresRef.current = structuresRef.current!.concat(column);
+      });
+    }
+
+    if (props.world.docks) {
+      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, meshRef.current);
+      structuresRef.current = structuresRef.current.concat(docksPlatform);
+    }
   
     const townSquarePlatform = drawTownSquare(props.world, meshRef.current);
-    structuresRef.current =  structuresRef.current.concat(townSquarePlatform);
+    structuresRef.current = structuresRef.current.concat(townSquarePlatform);
 
     structuresRef.current.forEach((thing) => sceneRef.current!.add(thing));
+  }
+
+  const drawRoads = () => {
+    if (!props.world || !sceneRef.current || !roadsRef.current) return;
+
+    roadsRef.current = [];
+    if (props.world.templePath) {
+      roadsRef.current = roadsRef.current.concat(createPath(props.world.templePath!, props.world.heightmap));
+    }
+    if (props.world.docksPath) {
+      roadsRef.current = roadsRef.current.concat(createPath(props.world.docksPath!, props.world.heightmap));
+    }
+
+    roadsRef.current.forEach((roadSegments) => {
+      sceneRef.current!.add(roadSegments);
+    }) 
   }
 
   const drawStructureFlares = () => {
     if (!sceneRef.current || !props.world || !meshRef.current) return;
     const [townSquare, temple, docks] = drawTownLocations(props.world!, meshRef.current!);
       flaresRef.current = [townSquare, temple, docks];
-      sceneRef.current.add(townSquare);
-      sceneRef.current.add(temple);
-      sceneRef.current.add(docks);
+      if (townSquare) {
+        sceneRef.current.add(townSquare);
+      }
+      if (temple) {
+        sceneRef.current.add(temple);
+      }
+      if (docks) {
+        sceneRef.current.add(docks);
+      }
   };
 
   const drawWaterAccumulationDiagram = () => {
     if (!sceneRef.current || !props.world) return;
-    waterAccumulationRef.current = createWaterAccumulationField(props.world.waterAccumulation);
+    waterAccumulationRef.current = createWaterAccumulationField(props.world.waterAccumulation, props.world.heightmap);
     sceneRef.current.add(waterAccumulationRef.current);
   }
 
@@ -242,12 +274,20 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       structuresRef.current.forEach((thing) => sceneRef.current!.remove(thing));
     }
   }, [props.displayParams.drawStructures])
+
+  useEffect(() =>{
+    if (props.displayParams.drawRoads) {
+      drawRoads();
+    } else if (roadsRef.current) {
+      roadsRef.current.forEach((thing) => sceneRef.current!.remove(thing));
+    }
+  }, [props.displayParams.drawRoads])
   
   useEffect(() =>{
     if (props.displayParams.showStructureFlares) {
       drawStructureFlares();
     } else if (flaresRef.current) {
-      flaresRef.current.forEach((thing) => {sceneRef.current!.remove(thing);})
+      flaresRef.current.forEach((thing) => {if (thing) sceneRef.current!.remove(thing);})
     }
   }, [props.displayParams.showStructureFlares])
 
@@ -298,10 +338,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     
     // Refresh array refs
     structuresRef.current = [];
+    roadsRef.current = [];
 
     if (sceneRef.current) {
       if (props.displayParams.drawTerrain) drawTerrain();
       if (props.displayParams.drawStructures) drawStructures();
+      if (props.displayParams.drawRoads) drawRoads();
       if (props.displayParams.showStructureFlares) drawStructureFlares();
       if (props.displayParams.showFlowDirections) drawFlowDiagram();
       if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();

@@ -1,5 +1,5 @@
 import { DIRECTION_OFFSETS } from "./constants";
-import { WorldGenParams } from "./types";
+import { WorldGenParams, Point, HeightMap, MapMask, SlopeMap } from "./types";
 import p5 from 'p5';
 
 const generateHeightmap = (p: p5, params: WorldGenParams): number[][] => {
@@ -107,7 +107,7 @@ const blurHeightmap = (heightmap: number[][], params: WorldGenParams): number[][
   return newHeightmap;
 };
 
-const floodFillOcean = (heightmap: number[][], params: WorldGenParams): boolean[][] => {
+export const floodFillOcean = (heightmap: number[][], params: WorldGenParams): boolean[][] => {
   const size = params.canvasSize;
   const ocean = Array(size).fill(null).map(() => Array(size).fill(false));
   const queue = [{ x: size - 1, y: 0 }]; // Start from the top-right corner
@@ -169,10 +169,14 @@ export const getRandomLandTile = (heightmap: number[][], params: WorldGenParams)
 export const findHighestPoint = (heightmap: number[][], center: { x: number; y: number }, minRadius: number, maxRadius: number): { x: number; y: number } => {
   const size = heightmap.length;
   let highestPoint = center;
-  let maxHeight = heightmap[center.x][center.y];
+  let maxHeight = 0;
 
   for (let dx = -maxRadius; dx <= maxRadius; dx++) {
-    if (dx > -minRadius && dx < minRadius) continue;
+    console.log("Trying dx = ", dx);
+    if (dx > -minRadius && dx < minRadius) {
+      console.log("Too close to town center");
+      continue;
+    }
     for (let dy = -maxRadius; dy <= maxRadius; dy++) {
       if (dy > -minRadius && dy < minRadius) continue;
       const x = center.x + dx;
@@ -189,9 +193,7 @@ export const findHighestPoint = (heightmap: number[][], center: { x: number; y: 
   return highestPoint;
 };
 
-export const findClosestWaterBorder = (heightmap: number[][], center: { x: number; y: number }, params: WorldGenParams): { x: number; y: number } => {
-  const oceanTiles = floodFillOcean(heightmap, params);
-  
+export const findClosestWaterBorder = (heightmap: HeightMap, oceanTiles: MapMask, center: Point): Point => {
   const size = heightmap.length;
   let closestPoint = null;
   let minDistance = Infinity;
@@ -223,11 +225,9 @@ export const generateWorldTerrain = (params: WorldGenParams): number[][] => {
 // 8 ←   → 4
 //   ↙ ↓ ↘
 // 7   6   5
-export const computeFlowDirection = (heightmap: number[][]): (number | null)[][] => {
+export const computeFlowDirection = (heightmap: HeightMap, oceanTiles: MapMask): (number | null)[][] => {
   // New params
   const slopeTolerance = 0.000001;
-  
-  const isLand = (num: number) => {return num > 0.0001}
   
   const height = heightmap.length;
   const width = heightmap[0].length;
@@ -235,7 +235,7 @@ export const computeFlowDirection = (heightmap: number[][]): (number | null)[][]
 
   for (let x = 0; x < height; x++) {
     for (let y = 0; y < width; y++) {
-      if (!isLand(heightmap[x][y])) continue; // Skip non-land tiles
+      if (oceanTiles[x][y]) continue; // Skip non-land tiles
 
       let maxSlope = -Infinity;
       let bestDirectionIndex: number | null = null;
@@ -250,8 +250,8 @@ export const computeFlowDirection = (heightmap: number[][]): (number | null)[][]
         // Ensure neighbor is within bounds
         if (nx >= 0 && nx < height && ny >= 0 && ny < width) {
           // Prioritize going into the sea
-          const slope = (heightmap[nx][ny] > 0.0001 ? heightmap[x][y] - heightmap[nx][ny] : 1);
-          console.log("Slope from (", x, ", ", y, ") to (", nx, ", ", ny, "): ", slope);
+          const slope = (oceanTiles[nx][ny] ? 1 : heightmap[x][y] - heightmap[nx][ny]);
+          //console.log("Slope from (", x, ", ", y, ") to (", nx, ", ", ny, "): ", slope);
 
 
           if (slope > maxSlope) {
@@ -261,7 +261,7 @@ export const computeFlowDirection = (heightmap: number[][]): (number | null)[][]
             //console.log("Best direction is ", bestDirectionIndex);
           }
           else {
-            console.log("Slope ", slope, " is not steeper the max ", maxSlope);
+            //console.log("Slope ", slope, " is not steeper the max ", maxSlope);
           }
         }
       }
@@ -269,18 +269,18 @@ export const computeFlowDirection = (heightmap: number[][]): (number | null)[][]
       if (!(bestDirectionIndex === null)) {
         const [finalDx, finalDy] = DIRECTION_OFFSETS[bestDirectionIndex];
 
-        console.log("Best direction is ", bestDirectionIndex," i.e. water will flow from (", x, ", ", y, ") to (", x + finalDx, ", ", y + finalDy, ")");
+        //console.log("Best direction is ", bestDirectionIndex," i.e. water will flow from (", x, ", ", y, ") to (", x + finalDx, ", ", y + finalDy, ")");
 
         if (heightmap[x + finalDx][y + finalDy] > heightmap[x][y]) {
-          console.error("BIG ERROR");
+          //console.error("BIG ERROR");
          }
         //console.log("Max slope is ", maxSlope, " in direction ", bestDirectionIndex);
         if (maxSlope < slopeTolerance) {
           // We found a basin
-          console.log("Basin!")
+          //console.log("Basin!")
           flowDirection[x][y] = null;
         } else {
-          console.log("Winner! ", bestDirectionIndex);
+          //console.log("Winner! ", bestDirectionIndex);
           flowDirection[x][y] = bestDirectionIndex;
         }
       }
@@ -296,7 +296,7 @@ export const computeFlowDirection = (heightmap: number[][]): (number | null)[][]
   return flowDirection;
 }
 
-export const accumulateWater = (flowDirection: (number | null)[][], heightmap: number[][]): number[][] => {
+export const accumulateWater = (flowDirection: SlopeMap, heightmap: HeightMap): number[][] => {
   const height = flowDirection.length;
   const width = flowDirection[0].length;
   
@@ -323,7 +323,7 @@ export const accumulateWater = (flowDirection: (number | null)[][], heightmap: n
         const nextX = currentX + dx;
         const nextY = currentY + dy;
 
-        console.log("Direction from (", currentX, ", ", currentY, ") is ", direction, " i.e. water will flow to (", nextX, ", ", nextY, ")");
+        //console.log("Direction from (", currentX, ", ", currentY, ") is ", direction, " i.e. water will flow to (", nextX, ", ", nextY, ")");
 
         // Check bounds to ensure we're within the grid
         if (nextX < 0 || nextX >= height || nextY < 0 || nextY >= width) {
@@ -337,7 +337,7 @@ export const accumulateWater = (flowDirection: (number | null)[][], heightmap: n
         // Accumulate water in the next cell
         waterAccumulation[nextX][nextY] += 1;
 
-        console.log("Starting from rainfall on cell (", x, ", ", y, ") accumulated 1 water unit from cell (", currentX, ", ", currentY, ") (height ", heightmap[currentX][currentY], ") to cell (", nextX, ", ", nextY, ") (height ", heightmap[nextX][nextY], ")");
+        //console.log("Starting from rainfall on cell (", x, ", ", y, ") accumulated 1 water unit from cell (", currentX, ", ", currentY, ") (height ", heightmap[currentX][currentY], ") to cell (", nextX, ", ", nextY, ") (height ", heightmap[nextX][nextY], ")");
 
         // Move to the next cell
         currentX = nextX;
@@ -345,8 +345,6 @@ export const accumulateWater = (flowDirection: (number | null)[][], heightmap: n
       }
     }
   }
-
-  console.log(waterAccumulation);
 
   return waterAccumulation;
 };

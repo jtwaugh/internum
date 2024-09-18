@@ -1,11 +1,21 @@
+export type Point = { x: number, y: number };
+export type HeightMap = number[][];
+export type SlopeMap = (number | null)[][];
+export type WaterAccumulationMap = number[][];
+export type MapMask = boolean[][];
+
 export interface World {
-    heightmap: number[][];
-    flowDirections: (number | null)[][];
-    waterAccumulation: number[][];
+    heightmap: HeightMap;
+    oceanTiles: MapMask;
+    flowDirections: SlopeMap;
+    waterAccumulation: WaterAccumulationMap;
     // Locations for generating the town
-    townSquare: { x: number; y: number };
-    temple: { x: number; y: number };
-    docks: { x: number; y: number };
+    townSquare: Point;
+    // If the island is small enough, these structures won't generate
+    temple: Point | null;
+    docks: Point | null;
+    templePath: Point[] | null,
+    docksPath: Point[] | null
   }
 
 export interface ColorsConfig {
@@ -25,7 +35,9 @@ export interface WorldGenParams {
 export interface DisplayParams {
   drawTerrain: boolean;
   drawStructures: boolean;
+  drawRoads: boolean;
   showStructureFlares: boolean;
   showFlowDirections: boolean;
   showWaterAccumulation: boolean;
 }
+

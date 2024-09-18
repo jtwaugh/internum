@@ -70,6 +70,7 @@ export default function Home() {
     {
       drawTerrain: true,
       drawStructures: true,
+      drawRoads: true,
       showStructureFlares: false,
       showWaterAccumulation: false,
       showFlowDirections: false,
@@ -233,6 +234,19 @@ export default function Home() {
                     }}
                   />
                   <Label htmlFor='show-structure-flares' className='px-2'>Show structures</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.drawRoads}
+                    id='show-structures' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, drawRoads: !currentDisplayParams.drawRoads};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-roads' className='px-2'>Show roads</Label>
                 </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 

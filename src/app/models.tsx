@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { ColorsConfig, World } from '@/types';
+import { ColorsConfig, World, Point, HeightMap } from '@/types';
 import { MESH_THICKNESS, DIRECTION_OFFSETS } from '@/constants';
 
 
@@ -31,80 +31,89 @@ export const drawTownLocations = (world: World, mesh: THREE.Mesh) => {
       world.heightmap[world.townSquare.x][(world.heightmap.length - world.townSquare.y)] * MESH_THICKNESS
     );
 
-    const docksPosition = new THREE.Vector3(
-      world.docks.x - geometry.parameters.width / 2,
-      (world.heightmap.length - world.docks.y) - geometry.parameters.height / 2,
-      world.heightmap[world.docks.x][(world.heightmap.length - world.docks.y)] * MESH_THICKNESS
-    );
+    let docksLine = null;
+    if (world.docks) {
+      const docksPosition = new THREE.Vector3(
+        world.docks.x - geometry.parameters.width / 2,
+        (world.heightmap.length - world.docks.y) - geometry.parameters.height / 2,
+        world.heightmap[world.docks.x][(world.heightmap.length - world.docks.y)] * MESH_THICKNESS
+      );
 
-    const templePosition = new THREE.Vector3(
-      world.temple.x - geometry.parameters.width / 2,
-      (world.heightmap.length - world.temple.y) - geometry.parameters.height / 2,
-      world.heightmap[world.temple.x][(world.heightmap.length - world.temple.y)] * MESH_THICKNESS
-    );
+      const docksTop = new THREE.Vector3(
+        docksPosition.x,
+        docksPosition.y,
+        docksPosition.z + 10
+      );
 
+      docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
+    }
+
+    let templeLine = null;
+    if (world.temple) {
+      const templePosition = new THREE.Vector3(
+        world.temple.x - geometry.parameters.width / 2,
+        (world.heightmap.length - world.temple.y) - geometry.parameters.height / 2,
+        world.heightmap[world.temple.x][(world.heightmap.length - world.temple.y)] * MESH_THICKNESS
+      );
+
+      const templeTop = new THREE.Vector3(
+        templePosition.x,
+        templePosition.y,
+        templePosition.z + 10
+      );
+  
+      templeLine = createThickLine(templePosition, templeTop, 0xffff00);
+    }
+
+    
     const townSquareTop = new THREE.Vector3(
       townSquarePosition.x,
       townSquarePosition.y,
       townSquarePosition.z + 10
     );
 
-    const docksTop = new THREE.Vector3(
-      docksPosition.x,
-      docksPosition.y,
-      docksPosition.z + 10
-    );
-
-    const templeTop = new THREE.Vector3(
-      templePosition.x,
-      templePosition.y,
-      templePosition.z + 10
-    );
-
     const townSquareLine = createThickLine(townSquarePosition, townSquareTop, 0xff00ff);
-    const docksLine = createThickLine(docksPosition, docksTop, 0x00ffff);
-    const templeLine = createThickLine(templePosition, templeTop, 0xffff00);
     
     return [townSquareLine, docksLine, templeLine];
   };
 
-export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) : [a: THREE.Mesh, b: THREE.Mesh[]] => {
-    const geometry = mesh.geometry as THREE.PlaneGeometry;
-    const templePosition = new THREE.Vector3(
-      world.temple.x - geometry.parameters.width / 2,
-      (world.heightmap.length - world.temple.y) - geometry.parameters.height / 2,
-      world.heightmap[world.temple.x][world.temple.y] * MESH_THICKNESS
-    );
+export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THREE.Mesh, normalizer: number) : [a: THREE.Mesh, b: THREE.Mesh[]] => {
+  const geometry = mesh.geometry as THREE.PlaneGeometry;
+  const templePosition = new THREE.Vector3(
+    templeCoords.x - geometry.parameters.width / 2,
+    (heightmap.length - templeCoords.y) - geometry.parameters.height / 2,
+    heightmap[templeCoords.x][templeCoords.y] * MESH_THICKNESS
+  );
 
-    const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
+  const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
 
-    // Create the Platform (elevated box)
-    const platformGeometry = new THREE.CylinderGeometry(15 / normalizer, 13 / normalizer, 2 / normalizer, 32);
-    const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
-    platform.position.set(templePosition.x, templePosition.y, templePosition.z);
-    platform.rotation.x = -Math.PI / 2;
+  // Create the Platform (elevated box)
+  const platformGeometry = new THREE.CylinderGeometry(15 / normalizer, 13 / normalizer, 2 / normalizer, 32);
+  const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
+  platform.position.set(templePosition.x, templePosition.y, templePosition.z);
+  platform.rotation.x = -Math.PI / 2;
 
-    // Create a Column
-    const columnGeometry = new THREE.CylinderGeometry(0.5 / normalizer, 0.5 / normalizer, 10 / normalizer, 32);
+  // Create a Column
+  const columnGeometry = new THREE.CylinderGeometry(0.5 / normalizer, 0.5 / normalizer, 10 / normalizer, 32);
 
-    // Position Columns around the Platform
-    const columnCount = 12; // Number of columns
-    const radius = 12 / normalizer; // Radius from the center to place the columns
+  // Position Columns around the Platform
+  const columnCount = 12; // Number of columns
+  const radius = 12 / normalizer; // Radius from the center to place the columns
 
-    let columns: THREE.Mesh[] = [];
-    for (let i = 0; i < columnCount; i++) {
-        const angle = (i / columnCount) * 2 * Math.PI;
-        const x = radius * Math.cos(angle) + templePosition.x;
-        const y = radius * Math.sin(angle) + templePosition.y;
+  let columns: THREE.Mesh[] = [];
+  for (let i = 0; i < columnCount; i++) {
+      const angle = (i / columnCount) * 2 * Math.PI;
+      const x = radius * Math.cos(angle) + templePosition.x;
+      const y = radius * Math.sin(angle) + templePosition.y;
 
-        const column = new THREE.Mesh(columnGeometry, marbleMaterial);
-        column.position.set(x, y, templePosition.z + 5 / normalizer); // 5 is half the height of the column
-        column.rotation.x = -Math.PI / 2;
-        columns = columns.concat(column);
-    }
-
-    return [platform, columns];
+      const column = new THREE.Mesh(columnGeometry, marbleMaterial);
+      column.position.set(x, y, templePosition.z + 5 / normalizer); // 5 is half the height of the column
+      column.rotation.x = -Math.PI / 2;
+      columns = columns.concat(column);
   }
+
+  return [platform, columns];
+}
 
  export const drawTownSquare = (world: World, mesh: THREE.Mesh) => {
     const geometry = mesh.geometry as THREE.PlaneGeometry;
@@ -119,6 +128,23 @@ export const drawTemple = (world: World, mesh: THREE.Mesh, normalizer: number) :
     const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
     const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
     platform.position.set(townSquarePosition.x, townSquarePosition.y, townSquarePosition.z); // Raise the platform above ground level
+
+    return platform;
+  }
+
+  export const drawDocks = (docksCoords: Point, heightmap: HeightMap, mesh: THREE.Mesh) => {
+    const geometry = mesh.geometry as THREE.PlaneGeometry;
+    const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
+
+    const docksPosition = new THREE.Vector3(
+      docksCoords.x - geometry.parameters.width / 2,
+      (heightmap.length - docksCoords.y) - geometry.parameters.height / 2,
+      heightmap[docksCoords.x][docksCoords.y] * MESH_THICKNESS
+    );
+
+    const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
+    const platform = new THREE.Mesh(platformGeometry, marbleMaterial);
+    platform.position.set(docksPosition.x, docksPosition.y, docksPosition.z); // Raise the platform above ground level
 
     return platform;
   }
@@ -193,7 +219,7 @@ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
   return retMesh;
 };
 
-export const createWaterAccumulationField = (waterAccumulation: number[][]): THREE.Group => {
+export const createWaterAccumulationField = (waterAccumulation: number[][], heightmap: number[][]): THREE.Group => {
   const gridSize = waterAccumulation.length;
   const color = new THREE.Color(0x2222dd); // Same color for all particles (green)
 
@@ -227,7 +253,7 @@ export const createWaterAccumulationField = (waterAccumulation: number[][]): THR
       const hexMesh = new THREE.Mesh(hexGeometry, hexMaterial);
 
       // Position the hexagon in a grid
-      hexMesh.position.set(x - gridSize / 2, (gridSize - y) - gridSize / 2, 10);
+      hexMesh.position.set(x - gridSize / 2, (gridSize - y) - gridSize / 2, heightmap[x][y] * 10 + 0.5);
 
       hexagons.add(hexMesh);
     }
@@ -257,4 +283,25 @@ export const createFlowDiagram = (flowDirections: (number | null)[][]): THREE.Gr
   //console.log(arrowGroup);
 
   return arrowGroup;
+}
+
+export const createPath = (points: Point[], heightmap: HeightMap) => {
+  const geometry = new THREE.BufferGeometry();
+  const gridSize = heightmap.length;
+
+  let vertices = new Float32Array(points.length * 3);
+  
+  points.forEach((point, i) => {
+    vertices[i * 3] = point.x - gridSize / 2;
+    vertices[i * 3 + 1] = (gridSize - point.y) - gridSize / 2;
+    vertices[i * 3 + 2] = 10 * heightmap[point.x][point.y] + 0.2;
+  });
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+  // Create the material
+  const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+
+  // Create the LineSegments object
+  return new THREE.Line(geometry, material);
 }
