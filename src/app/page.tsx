@@ -63,7 +63,9 @@ export default function Home() {
         canvasSize: Constants.DEFAULT_CANVAS_SIZE,
         threshold: Constants.DEFAULT_THRESHOLD,
         maxDistanceFactor: Constants.DEFAULT_MAX_DISTANCE_FACTOR,
-        blurIterations: Constants.DEFAULT_BLUR_ITERATIONS
+        blurIterations: Constants.DEFAULT_BLUR_ITERATIONS,
+        erosionRate: Constants.DEFAULT_EROSION_RATE,
+        erosionIterations: Constants.DEFAULT_EROSION_ITERATIONS,
     }
   )
   const [currentDisplayParams, setCurrentDisplayParams] = useState<DisplayParams>(
@@ -74,6 +76,7 @@ export default function Home() {
       showStructureFlares: false,
       showWaterAccumulation: false,
       showFlowDirections: false,
+      showTrees: false,
     }
   )
 
@@ -286,6 +289,19 @@ export default function Home() {
                     }}
                   />
                   <Label htmlFor='show-flow-direction' className='px-2'>Show flow direction</Label>
+                </MenubarItem>
+                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
+                  <Checkbox 
+                    checked={currentDisplayParams.showTrees}
+                    id='show-trees' 
+                    onClick={
+                      () => {
+                        const newParams = {...currentDisplayParams, showTrees: !currentDisplayParams.showTrees};
+                        
+                        setCurrentDisplayParams(newParams);
+                    }}
+                  />
+                  <Label htmlFor='show-trees' className='px-2'>Show trees</Label>
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { ColorsConfig, World, Point, HeightMap } from '@/types';
+import { ColorsConfig, World, Point, HeightMap, WaterAccumulationMap } from '@/types';
 import { MESH_THICKNESS, DIRECTION_OFFSETS } from '@/constants';
 
 
@@ -178,6 +178,17 @@ export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THRE
 export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
   const canvasSize = world.heightmap.length;
 
+  // Optional: color water vertices
+  // const displayThreshold = 0.05;
+
+  // let scaler = 0;
+  // for (let x = 0; x < canvasSize; x++) {
+  //   for (let y = 0; y < canvasSize; y++) { 
+  //     if (world.waterAccumulation[x][y] === null) continue;
+  //     if (world.waterAccumulation[x][y] > scaler) scaler = world.waterAccumulation[x][y];
+  //   }
+  // }
+
   const geometry = new THREE.PlaneGeometry(
     canvasSize,
     canvasSize,
@@ -195,7 +206,7 @@ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
     geometry.attributes.position.setZ(i / 3, world.heightmap[x][y] * 10); // Adjust multiplier for height scaling
 
     let color;
-    if (world.heightmap[x][y] < 0.001) {
+    if (world.heightmap[x][y] < 0.001) { // || world.waterAccumulation[x][y] / scaler > displayThreshold
       color = new THREE.Color(colorsConfig.terrainGradient[0]);
     } else if (world.heightmap[x][y] < 0.5) {
       color = new THREE.Color(interpolateColor(colorsConfig.terrainGradient[1], colorsConfig.terrainGradient[2], world.heightmap[x][y] * 2));
@@ -219,7 +230,7 @@ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
   return retMesh;
 };
 
-export const createWaterAccumulationField = (waterAccumulation: number[][], heightmap: number[][]): THREE.Group => {
+export const createWaterAccumulationField = (waterAccumulation: WaterAccumulationMap, heightmap: HeightMap): THREE.Group => {
   const gridSize = waterAccumulation.length;
   const color = new THREE.Color(0x2222dd); // Same color for all particles (green)
 
@@ -304,4 +315,69 @@ export const createPath = (points: Point[], heightmap: HeightMap) => {
 
   // Create the LineSegments object
   return new THREE.Line(geometry, material);
+}
+
+export const drawTree = (treeCoords: Point, heightmap: HeightMap, waterFraction: number) => {
+  let ret = new THREE.Group();
+
+  const treeBaseHeight = heightmap[treeCoords.x][treeCoords.y] * 10 + 0.6 + 0.4 * waterFraction;
+  const treeBaseX = Math.random() + treeCoords.x  - heightmap.length / 2;
+  const treeBaseY = Math.random() + (heightmap.length - treeCoords.y) - heightmap.length / 2
+
+  // Create the tree trunk
+  const trunkGeometry = new THREE.CylinderGeometry(0.02 + 0.05 * waterFraction, 0.03 + 0.05 * waterFraction, 0.5, 6); // Cylinder (trunk) with a hexagonal base
+  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown color for the trunk
+  const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+  trunk.position.set(treeBaseX, treeBaseY, treeBaseHeight); // Raise the trunk above the ground
+  trunk.rotation.x = -Math.PI / 2;
+  ret.add(trunk);
+
+  // Create the foliage (tree top) using cones
+  const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Green color for the leaves
+
+  const foliageGeometries = [
+      new THREE.ConeGeometry(0.25 + 0.25 * waterFraction, 0.15 + 0.15 * waterFraction, 5), // Lower cone
+      new THREE.ConeGeometry(0.2 + 0.2 * waterFraction, 0.18 + 0.18 * waterFraction, 5), // Middle cone
+      new THREE.ConeGeometry(0.15 + 0.15 * waterFraction, 0.1 + 0.1 * waterFraction, 5) // Top cone
+  ];
+
+  const foliagePositions = [0.1 + 0.4 * waterFraction, 0.2 + 0.4 * waterFraction, 0.3 + 0.4 * waterFraction]; // Y-positions for the foliage
+
+  foliageGeometries.forEach((geometry, index) => {
+      const foliage = new THREE.Mesh(geometry, foliageMaterial);
+      foliage.rotation.x = Math.PI / 2;
+      foliage.position.set(treeBaseX, treeBaseY, treeBaseHeight + foliagePositions[index]); // Position each cone above the trunk
+      ret.add(foliage);
+  });
+
+  return ret;
+}
+
+export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightmap: HeightMap): THREE.Group[] => {
+  const size = heightmap.length;
+  let ret: THREE.Group[] = [];
+
+  let scaler = 0;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) { 
+      if (waterAccumulation[x][y] === null) continue;
+      if (waterAccumulation[x][y] > scaler) scaler = waterAccumulation[x][y];
+    }
+  }
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      if (heightmap[x][y] < 0.0001) continue;
+
+      const waterFraction = Math.log(waterAccumulation[x][y] / scaler * (scaler - 1) + 1) / Math.log(scaler);
+
+      if (waterFraction > 0.3) {
+        ret = ret.concat(drawTree({x: x, y: y}, heightmap, waterFraction));
+        console.log("Added tree at (", x, ", ", y, ")");
+        console.log("ret = ", ret);
+      }
+    }
+  }
+
+  return ret;
 }

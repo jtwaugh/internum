@@ -13,6 +13,8 @@ export const DEFAULT_CANVAS_SIZE = 400;
 export const DEFAULT_THRESHOLD = 0.5;
 export const DEFAULT_MAX_DISTANCE_FACTOR = 1;
 export const DEFAULT_BLUR_ITERATIONS = 1;
+export const DEFAULT_EROSION_RATE = 0.5;
+export const DEFAULT_EROSION_ITERATIONS = 2;
 
 export const DEFAULT_FOV = 75;
 export const DEFAULT_ASPECT = 1.5;

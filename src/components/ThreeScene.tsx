@@ -16,7 +16,8 @@ import {
   createFlowDiagram, 
   createWaterAccumulationField,
   createPath,
-  drawDocks
+  drawDocks,
+  drawTreesOnMap
 } from '@/app/models';
 
 export interface ThreeSceneProps {
@@ -70,6 +71,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const roadsRef = useRef<THREE.Line[]>([]);
   const arrowsRef = useRef<THREE.Group | null>(null);
   const waterAccumulationRef = useRef<THREE.Group | null>(null);
+  const treesGroupsRef = useRef<THREE.Group[]>([]);
 
 
   const resetCamera = () => {
@@ -253,6 +255,12 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     sceneRef.current.add(waterAccumulationRef.current);
   }
 
+  const drawTrees = () => {
+    if (!sceneRef.current || !props.world) return;
+    treesGroupsRef.current = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap);
+    treesGroupsRef.current.forEach((treeGroup) => sceneRef.current!.add(treeGroup));
+  }
+
   const drawFlowDiagram = () => {
     if (!sceneRef.current || !props.world || !meshRef.current) return;
     arrowsRef.current = createFlowDiagram(props.world.flowDirections);
@@ -308,6 +316,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     }
   }, [props.displayParams.showWaterAccumulation])
 
+  useEffect(() =>{
+    if (props.displayParams.showTrees) {
+      drawTrees();
+    } else if (treesGroupsRef.current) {
+      treesGroupsRef.current.forEach((thing) => {if (thing) sceneRef.current!.remove(thing);})
+    }
+  }, [props.displayParams.showTrees])
+
   useEffect(() => {
     const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
     ambientLightRef.current = ambientLight;
@@ -347,6 +363,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       if (props.displayParams.showStructureFlares) drawStructureFlares();
       if (props.displayParams.showFlowDirections) drawFlowDiagram();
       if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
+      if (props.displayParams.showTrees) drawTrees();
       
 
       if (ambientLightRef.current) {

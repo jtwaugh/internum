@@ -30,6 +30,8 @@ export interface WorldGenParams {
   threshold: number;
   maxDistanceFactor: number;
   blurIterations: number;
+  erosionRate: number;
+  erosionIterations: number;
 }
 
 export interface DisplayParams {
@@ -39,5 +41,6 @@ export interface DisplayParams {
   showStructureFlares: boolean;
   showFlowDirections: boolean;
   showWaterAccumulation: boolean;
+  showTrees: boolean;
 }
 

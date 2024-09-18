@@ -1,5 +1,5 @@
 import { DIRECTION_OFFSETS } from "./constants";
-import { WorldGenParams, Point, HeightMap, MapMask, SlopeMap } from "./types";
+import { WorldGenParams, Point, HeightMap, MapMask, SlopeMap, WaterAccumulationMap } from "./types";
 import p5 from 'p5';
 
 const generateHeightmap = (p: p5, params: WorldGenParams): number[][] => {
@@ -77,7 +77,7 @@ const generateGaussianKernel = (radius: number, sigma: number): number[][] => {
     return blurredHeightmap;
   };
 
-const blurHeightmap = (heightmap: number[][], params: WorldGenParams): number[][] => {
+const blurHeightmap = (heightmap: HeightMap, params: WorldGenParams): HeightMap => {
   let oldHeightmap = heightmap;
   let newHeightmap = heightmap;
 
@@ -107,7 +107,39 @@ const blurHeightmap = (heightmap: number[][], params: WorldGenParams): number[][
   return newHeightmap;
 };
 
-export const floodFillOcean = (heightmap: number[][], params: WorldGenParams): boolean[][] => {
+export const erodeHeightmap = (heightmap: HeightMap, flowDirection: SlopeMap, waterAccumulation: WaterAccumulationMap, params: WorldGenParams): HeightMap => {
+  const size = heightmap.length;
+  let newHeightmap = heightmap;
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      // Erode this tile if it has water accumulation above the threshold
+      if (waterAccumulation[x][y] > 0) {
+        const erosionAmount = (params.erosionRate * 0.0005) * waterAccumulation[x][y];
+        newHeightmap[x][y] = Math.max(0, heightmap[x][y] - erosionAmount);
+        // console.log("Eroded ", erosionAmount, " at (", x, ", ", y, ")");
+        // TODO take it downhill and lift up some beach
+        // let next = {x: x, y: y};
+        // while (heightmap[next.x][next.y] > 0.0001) {
+        //   const direction = flowDirection[next.x][next.y];
+
+        //   if (direction === null) {
+        //     // This shouldn't happen
+        //     console.log("Erosion broke");
+        //     break;
+        //   }
+
+        //   // Get the neighbor offset for the flow direction
+        //   const [dx, dy] = DIRECTION_OFFSETS[direction]; // Direction index is 1-8, adjust to 0-based
+        //   next = {x: next.x + dx, y: next.y + dy};
+        }
+      }
+    }
+
+  return newHeightmap;
+}
+
+export const floodFillOcean = (heightmap: HeightMap, params: WorldGenParams): boolean[][] => {
   const size = params.canvasSize;
   const ocean = Array(size).fill(null).map(() => Array(size).fill(false));
   const queue = [{ x: size - 1, y: 0 }]; // Start from the top-right corner
@@ -172,9 +204,9 @@ export const findHighestPoint = (heightmap: number[][], center: { x: number; y: 
   let maxHeight = 0;
 
   for (let dx = -maxRadius; dx <= maxRadius; dx++) {
-    console.log("Trying dx = ", dx);
+    //console.log("Trying dx = ", dx);
     if (dx > -minRadius && dx < minRadius) {
-      console.log("Too close to town center");
+      //console.log("Too close to town center");
       continue;
     }
     for (let dy = -maxRadius; dy <= maxRadius; dy++) {
@@ -213,11 +245,13 @@ export const findClosestWaterBorder = (heightmap: HeightMap, oceanTiles: MapMask
   return closestPoint!;
 };
 
-export const generateWorldTerrain = (params: WorldGenParams): number[][] => {
+export const generateWorldTerrain = (params: WorldGenParams): HeightMap => {
   const p5Instance = new p5((p: p5) => {});
 
   const heightmap = generateHeightmap(p5Instance, params);
-  return blurHeightmap(heightmap, params);
+  const blurredHeightmap = blurHeightmap(heightmap, params);
+
+  return blurredHeightmap;
 }
 
 // 1   2   3

@@ -24,7 +24,7 @@ import {
 import { World, ColorsConfig, WorldGenParams } from '@/types';
 import GradientBuilder from './gradient-builder';
 import { ColorHexInput } from './color-hex-input';
-import { generateWorldTerrain, getRandomLandTile, findHighestPoint, findClosestWaterBorder, accumulateWater, computeFlowDirection, floodFillOcean } from '@/world-gen';
+import { generateWorldTerrain, getRandomLandTile, findHighestPoint, findClosestWaterBorder, accumulateWater, computeFlowDirection, floodFillOcean, erodeHeightmap } from '@/world-gen';
 
 
 interface IslandGeneratorProps {
@@ -41,6 +41,8 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
   const [threshold, setThreshold] = useState(props.params.threshold);
   const [maxDistanceFactor, setMaxDistanceFactor] = useState(props.params.maxDistanceFactor);
   const [blurIterations, setBlurIterations] = useState(props.params.blurIterations);
+  const [erosionRate, setErosionRate] = useState(props.params.erosionRate);
+  const [erosionIterations, setErosionIterations] = useState(props.params.erosionIterations);
 
   const [gradient, setGradient] = useState(Constants.DEFAULT_GRADIENT);
   const [ambientLightColor, setAmbientLightColor] = useState(Constants.DEFAULT_AMBIENT_LIGHT_COLOR);
@@ -67,10 +69,12 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
         canvasSize: canvasSize,
         threshold: threshold,
         maxDistanceFactor: maxDistanceFactor,
-        blurIterations: blurIterations
+        blurIterations: blurIterations,
+        erosionRate: erosionRate,
+        erosionIterations: erosionIterations
       }
     )
-  }, [noiseScale, canvasSize, threshold, maxDistanceFactor, blurIterations])
+  }, [noiseScale, canvasSize, threshold, maxDistanceFactor, blurIterations, erosionRate])
 
   useEffect(() => {
     setNoiseScale(props.params.noiseScale);
@@ -87,20 +91,34 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       canvasSize: canvasSize,
       threshold: threshold,
       maxDistanceFactor: maxDistanceFactor,
-      blurIterations: blurIterations
+      blurIterations: blurIterations,
+      erosionRate: erosionRate,
+      erosionIterations: erosionIterations,
     };
     
     const blurredHeightmap = generateWorldTerrain(params);
-    console.log(JSON.stringify(blurredHeightmap));
 
     const oceanTiles = floodFillOcean(blurredHeightmap, params);
 
-    const flowDirections = computeFlowDirection(blurredHeightmap, oceanTiles);
-    const waterAccumulation = accumulateWater(flowDirections, blurredHeightmap);
-    
-    const townSquarePosition = getRandomLandTile(blurredHeightmap, params);
+    let currentHeightmap = blurredHeightmap;
 
-    console.log("town square coords: ", townSquarePosition);
+    let flowDirections = computeFlowDirection(currentHeightmap, oceanTiles);
+    let waterAccumulation = accumulateWater(flowDirections, currentHeightmap);
+    let erodedHeightmap = erodeHeightmap(currentHeightmap, flowDirections, waterAccumulation, params);
+
+    if (params.erosionIterations > 1) {
+      for (let i = 0; i < params.erosionIterations; i++) {
+        currentHeightmap = erodedHeightmap;
+        flowDirections = computeFlowDirection(currentHeightmap, oceanTiles);
+        waterAccumulation = accumulateWater(flowDirections, currentHeightmap);
+        erodedHeightmap = erodeHeightmap(currentHeightmap, flowDirections, waterAccumulation, params);
+      }
+    }
+    
+
+    const townSquarePosition = getRandomLandTile(erodedHeightmap, params);
+
+    //console.log("town square coords: ", townSquarePosition);
 
     let templePath = null;
     let docksPath = null;
@@ -110,42 +128,44 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     
     const ROADS_RETRIES = 5;
 
-    console.log("Starting to try temple");
+    //console.log("Starting to try temple");
 
     for (let i = 0; i < ROADS_RETRIES; i += 1) {
-      templePosition = findHighestPoint(blurredHeightmap, townSquarePosition, Constants.TEMPLE_MIN_RADIUS, Constants.TEMPLE_MAX_RADIUS);
-      templePath = aStarWithSlopeConstraint(townSquarePosition, templePosition, blurredHeightmap, 999);
+      templePosition = findHighestPoint(erodedHeightmap, townSquarePosition, Constants.TEMPLE_MIN_RADIUS, Constants.TEMPLE_MAX_RADIUS);
+      templePath = aStarWithSlopeConstraint(townSquarePosition, templePosition, erodedHeightmap, 999);
       if (!(templePath === null)) {
         break;
       }
     }
 
     if (templePath) {
-      console.log("path to temple: ", templePath);
-      console.log("temple coords: ", templePath[templePath?.length - 1]);
+      // console.log("path to temple: ", templePath);
+      // console.log("temple coords: ", templePath[templePath?.length - 1]);
     }
 
-    console.log("Starting to try docks");
+    //console.log("Starting to try docks");
 
     for (let j = 0; j < ROADS_RETRIES; j += 1) {
-      docksPath = pathfindToOcean(townSquarePosition, oceanTiles, blurredHeightmap, 999);
+      docksPath = pathfindToOcean(townSquarePosition, oceanTiles, erodedHeightmap, 999);
       if (!(docksPath === null)) {
         break;
       }
     }
 
     if (docksPath) {
-      console.log("path to docks: ", docksPath);
-      console.log("docks coords: ", docksPath[docksPath?.length - 1]);
+      // console.log("path to docks: ", docksPath);
+      // console.log("docks coords: ", docksPath[docksPath?.length - 1]);
     }
 
     // const townSquarePosition = {x: 0, y: 0};
     // const templePosition = {x: 0, y: 0};
     // const docksPosition = {x: 0, y: 0};
 
+
+    // TODO ocean tiles not necessarily correct
     props.onWorldGenerated(
       {
-        heightmap: blurredHeightmap, 
+        heightmap: erodedHeightmap, 
         oceanTiles: oceanTiles,
         flowDirections: flowDirections, 
         waterAccumulation: waterAccumulation, 
@@ -241,6 +261,38 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
                   value={[blurIterations]}
                   onValueChange={(values) => {
                     setBlurIterations(values[0]);
+                  }
+                    }
+                />
+              </label>
+            </div>
+            <div>
+              <label>
+              <span className='p-2 font-bold text-xs'>Erosion Rate: {erosionRate}</span>
+                <Slider
+                  className='p-2'
+                  min={0.0}
+                  max={1.0}
+                  step={0.01}
+                  value={[erosionRate]}
+                  onValueChange={(values) => {
+                    setErosionRate(values[0]);
+                  }
+                    }
+                />
+              </label>
+            </div>
+            <div>
+              <label>
+              <span className='p-2 font-bold text-xs'>Erosion Iterations: {erosionIterations}</span>
+                <Slider
+                  className='p-2'
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={[erosionIterations]}
+                  onValueChange={(values) => {
+                    setErosionIterations(values[0]);
                   }
                     }
                 />

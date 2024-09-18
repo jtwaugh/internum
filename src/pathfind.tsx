@@ -40,7 +40,7 @@ export function pathfindToOcean(
   
       // Check if the current tile is an ocean tile
       if (heightmap[current.x][current.y] < 0.0001) {
-        console.log(current, " is an ocean tile");
+        //console.log(current, " is an ocean tile");
         return reconstructPath(cameFrom, start, current);
       }
   
@@ -120,7 +120,7 @@ export function aStarWithSlopeConstraint(
       if (Math.abs(slope) > maxSlope) continue; // Skip neighbors with too steep a slope
 
       if (heightmap[neighbor.y][neighbor.x] < 0.0001) {
-        console.log("Neighbor ", neighbor, " is a sea tile; can't place road");
+        //console.log("Neighbor ", neighbor, " is a sea tile; can't place road");
       }
 
       const newCost = (costSoFar.get(pointToString(current)) || 0) + movementCost(current, neighbor, heightmap);
