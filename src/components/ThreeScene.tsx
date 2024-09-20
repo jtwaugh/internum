@@ -32,7 +32,7 @@ export interface ThreeSceneProps {
 
 enum CameraMode {
   FreeFloat,
-  FreeFall,
+  Walking,
   FlyHack
 }
 
@@ -89,7 +89,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
 
   // Physics for free-fall
-  const fallSpeedRef = useRef(0); // Use ref to persist fall speed across renders
   const gravity = 9.81; // Simulating gravity
 
   // Input state
@@ -198,24 +197,36 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         freeFloatControlsRef.current!.update();
       } else if (controlsRef.current instanceof FPSControls) {
         // Event listener to lock pointer when user clicks on the canvas
-        console.log("Pointer lock movement");
+        console.log(event);
         switch (event.key) {
           case 'w':
-            velocityRef.current.y = moveSpeed; // Move forward
+            moveForward.current = true;
+            moveBackward.current = false;
             break;
           case 's':
-            velocityRef.current.y = -moveSpeed; // Move backward
+            moveBackward.current = true;
+            moveForward.current = false;
             break;
           case 'a':
-            velocityRef.current.x = -moveSpeed; // Move left
+            moveLeft.current = true;
+            moveRight.current = false;
             break;
           case 'd':
-            velocityRef.current.x = moveSpeed; // Move right
+            moveRight.current = true;
+            moveLeft.current = false;
             break;
-          case 'Space':
-            if (cameraRef.current.position.z <= 10) {
+          case ' ':
+            //console.log("Spacebar");
+            if (canJumpRef.current) {
+              //console.log("Jumping");
               velocityRef.current.z = moveSpeed * 2; // Jump logic (adjust as necessary)
+              canJumpRef.current = false;
             }
+          default:
+            moveForward.current = false;
+            moveBackward.current = false;
+            moveLeft.current = false;
+            moveRight.current = false;
             break;
         }
       }
@@ -228,15 +239,16 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       // Reset velocity when key is released
       switch (event.key) {
         case 'w':
+          moveForward.current = false;
+          break;
         case 's':
-          velocityRef.current.y = 0;
+          moveBackward.current = false;
           break;
         case 'a':
-        case 'd':
-          velocityRef.current.x = 0;
+          moveLeft.current = false;
           break;
-        case 'Space':
-          velocityRef.current.z = 0; // Reset vertical velocity after jump
+        case 'd':
+          moveRight.current = false;
           break;
       }
     };
@@ -471,28 +483,67 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       const delta = clockRef.current!.getDelta(); // Time between frames
 
       // Update the camera's fall if in free-fall mode
-      if (cameraModeRef.current === CameraMode.FreeFall) {
-        setCameraModeString("Free Fall")
-        fallSpeedRef.current += gravity * delta; // Increase fall speed due to gravity
-        cameraRef.current!.position.z -= fallSpeedRef.current * delta; // Move camera downwards
+      if (cameraModeRef.current === CameraMode.Walking) {
+        setCameraModeString("Gravity On")
 
-        const collisionResults = intersectPlane(cameraRef.current!.position, terrainMeshRef.current!);
+        const collisionResults = intersectPlane(new THREE.Vector3(cameraRef.current!.position.x, cameraRef.current!.position.y, 999), terrainMeshRef.current!);
+        const velocity = velocityRef.current; // Assuming you have a velocity ref for FPS movement
+
+        const moveSpeed = 10;
 
         if (collisionResults.length > 0) {
-          if (collisionResults[0].distance <= fallSpeedRef.current * delta) {
-            cameraRef.current!.position.z = 5;
-            cameraRef.current!.lookAt(new THREE.Vector3(1, 0, 0));
-            cameraRef.current!.setRotationFromEuler(new THREE.Euler(0, 0, 0, "ZYX"));
-            cameraModeRef.current = CameraMode.FlyHack;
-            controlsRef.current = pointerLockControlsRef.current;
-            fallSpeedRef.current = 0;
-            rendererRef.current!.domElement.addEventListener('click', () => {
-              if (controlsRef.current instanceof FPSControls) {
-                pointerLockControlsRef.current!.lock();
-              }
-            });
+          if (collisionResults[0].point.z > cameraRef.current!.position.z + velocityRef.current.z * delta - 0.5) {
+            //console.log("Ground is at ", collisionResults[0].point.z);
+            //console.log("You are going from ", cameraRef.current!.position.z, " to ", cameraRef.current!.position.z + velocityRef.current.z * delta,  " this frame");
+            // This will pop us out of the ground
+            cameraRef.current!.position.z = collisionResults[0].point.z + 0.5;
+
+            //console.log("We put you at ", cameraRef.current!.position.z = collisionResults[0].point.z + 0.5);
+            
+            if (velocity.z < 0.0001) {
+              //console.log("Hit ground");
+              velocity.z = 0;
+            } else {
+              //console.log("Jumping");
+              cameraRef.current!.position.z += velocity.z * delta;
+            }
+            
+            // Update velocity with delta
+            if (Math.abs(velocity.x) < 0.01) {
+              //console.log("Zeroing x velocity");
+              velocity.x = 0;  
+            } else {
+              //console.log("X friction");
+              velocity.x -= velocity.x * 10.0 * delta;
+            }
+            if (Math.abs(velocity.y) < 0.01) {
+              //console.log("Zeroing y velocity");
+              velocity.y = 0;  
+            } else {
+              //console.log("Y friction from ", velocity.y, " to ", velocity.y * 10.0 * delta);
+              velocity.y -= velocity.y * 10.0 * delta;
+            }
+            
+
+            // Update movement direction based on user input (WASD keys)
+            if (moveForward.current) velocity.y += moveSpeed * delta;
+            if (moveBackward.current) velocity.y -= moveSpeed * delta;
+            if (moveLeft.current) velocity.x -= moveSpeed * delta;
+            if (moveRight.current) velocity.x += moveSpeed * delta;
+
+            // We can jump if we are on the ground
+            canJumpRef.current = true;
+          } else {
+            //console.log("Falling");
+            cameraRef.current!.position.z += velocity.z * delta;
+            velocity.z -= gravity * delta; // Increase fall speed due to gravity
           }
         }
+    
+        // Apply movement to the PointerLockControls
+        (controlsRef.current as FPSControls).moveRight(velocity.x * delta);
+        (controlsRef.current as FPSControls).moveForward(-1 * velocity.y * delta);
+        
       } else if (cameraModeRef.current === CameraMode.FlyHack) {
         setCameraModeString("Fly-Hack");
         const moveSpeed = 10;
@@ -625,7 +676,14 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
                 onClick={() => {
                   freeFloatControlsRef.current!.enabled = false;
-                  cameraModeRef.current = CameraMode.FreeFall;
+                  controlsRef.current = pointerLockControlsRef.current;
+            
+                  rendererRef.current!.domElement.addEventListener('click', () => {
+                    if (controlsRef.current instanceof FPSControls) {
+                      pointerLockControlsRef.current!.lock();
+                    }
+                  });
+                  cameraModeRef.current = CameraMode.Walking;
                 }}>
                 🪂
               </Button>
