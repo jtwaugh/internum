@@ -33,7 +33,7 @@ export interface ThreeSceneProps {
 enum CameraMode {
   FreeFloat,
   FreeFall,
-  Walking
+  FlyHack
 }
 
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
@@ -483,12 +483,17 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
             cameraRef.current!.position.z = 5;
             cameraRef.current!.lookAt(new THREE.Vector3(1, 0, 0));
             cameraRef.current!.setRotationFromEuler(new THREE.Euler(0, 0, 0, "ZYX"));
-            cameraModeRef.current = CameraMode.Walking;
+            cameraModeRef.current = CameraMode.FlyHack;
             controlsRef.current = pointerLockControlsRef.current;
             fallSpeedRef.current = 0;
+            rendererRef.current!.domElement.addEventListener('click', () => {
+              if (controlsRef.current instanceof FPSControls) {
+                pointerLockControlsRef.current!.lock();
+              }
+            });
           }
         }
-      } else if (cameraModeRef.current === CameraMode.Walking) {
+      } else if (cameraModeRef.current === CameraMode.FlyHack) {
         setCameraModeString("Fly-Hack");
         const moveSpeed = 10;
         // Apply velocity and movement for PointerLockControls
@@ -563,6 +568,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
     freeFloatControlsRef.current!.target.copy(townSquarePosition); // Set the controls' target to the town square
     freeFloatControlsRef.current!.update();
+    pointerLockControlsRef.current!.unlock();
     freeFloatControlsRef.current!.enabled = true;
 
     rendererRef.current!.domElement.removeEventListener('click', () => {
@@ -631,7 +637,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
                       pointerLockControlsRef.current!.lock();
                     }
                   });
-                  cameraModeRef.current = CameraMode.Walking;
+                  cameraModeRef.current = CameraMode.FlyHack;
                   controlsRef.current = pointerLockControlsRef.current;
                 }}>
                 🛩️

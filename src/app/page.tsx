@@ -230,7 +230,7 @@ export default function Home() {
                 </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 
-                    checked={currentDisplayParams.drawTerrain}
+                    checked={currentDisplayParams.drawWater}
                     id='show-water-level' 
                     onClick={
                       () => {
@@ -252,7 +252,7 @@ export default function Home() {
                         setCurrentDisplayParams(newParams);
                     }}
                   />
-                  <Label htmlFor='show-structure-flares' className='px-2'>Show structures</Label>
+                  <Label htmlFor='show-structures' className='px-2'>Show structures</Label>
                 </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 
@@ -265,7 +265,7 @@ export default function Home() {
                         setCurrentDisplayParams(newParams);
                     }}
                   />
-                  <Label htmlFor='show-roads' className='px-2'>Show roads</Label>
+                  <Label htmlFor='show-structures' className='px-2'>Show roads</Label>
                 </MenubarItem>
                 <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
                   <Checkbox 
