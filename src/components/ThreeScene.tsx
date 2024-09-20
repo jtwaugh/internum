@@ -37,26 +37,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Game environment
   const envRef = useRef<GameEnvironment | null>(null);
 
-  // Props
   const colorConfigRef = useRef(props.colorsConfig);
-
-  // Actual scene objects
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
-  const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
-
-  // Layers for rendering
-  const terrainMeshRef = useRef<THREE.Mesh | null>(null);
-  const waterMeshRef = useRef<THREE.Mesh | null>(null);
-  const flaresRef = useRef<(THREE.Mesh | null)[]>([]);
-  const structuresRef = useRef<THREE.Mesh[]>([]);
-  const roadsRef = useRef<THREE.Line[]>([]);
-  const arrowsRef = useRef<THREE.Group | null>(null);
-  const waterAccumulationRef = useRef<THREE.Group | null>(null);
-  const treesGroupsRef = useRef<THREE.Group[]>([]);
 
   const resizeRendererToDisplaySize = () => {
     const width = mountRef.current?.clientWidth;
@@ -80,24 +63,10 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     rendererRef.current = renderer;
  
-    const gameEnvironment = new GameEnvironment(renderer);
+    const gameEnvironment = new GameEnvironment(renderer, colorConfigRef.current);
     envRef.current = gameEnvironment;
 
     mountRef.current!.appendChild(renderer.domElement);
-
-    // Constructor: Scene setup
-    const scene = new THREE.Scene();
-
-    const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
-    scene.add(ambientLight);
-    ambientLightRef.current = ambientLight;
-
-    const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight, 100);
-    directionalLight.position.set(50, 50, 50);
-    scene.add(directionalLight);
-    directionalLightRef.current = directionalLight;
-
-    sceneRef.current = scene;
 
     resizeRendererToDisplaySize();
 
@@ -129,211 +98,187 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }, []);
 
   const drawTerrain = () => {
-    if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
-
+    if (!colorConfigRef.current || !props.world || !envRef.current) return;
+    // Set the layer and its ref equal to a newly-generated terrain mesh
     const terrainMesh = generateMesh(props.world, colorConfigRef.current);
-
-    //console.log("Got terrain mesh");
-
-    terrainMeshRef.current = terrainMesh;
-
-    sceneRef.current.add(terrainMesh);
-
-    //console.log("Rendered terrain mesh");
+    envRef.current.setLayer("terrainMesh", terrainMesh);
   }
 
   const drawWaterLevel = () => {
-    if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
+    if (!colorConfigRef.current || !props.world || !envRef.current) return;
     const waterMesh = generateWaterMesh(props.world.waterLevel, props.world.heightmap.length, colorConfigRef.current);
-    waterMeshRef.current = waterMesh;
-
-    sceneRef.current.add(waterMesh);
+    envRef.current.setLayer("waterMesh", waterMesh);
   }
 
   const drawStructures = () => {
-    if (!terrainMeshRef.current || !props.world || !sceneRef.current || !structuresRef.current) return;
-    
+    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
+
+    const terrainMesh = envRef.current!.layers.terrainMesh!;
+    let structures: THREE.Mesh[] = [];
+
     if (props.world.temple) {
-      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, terrainMeshRef.current, 12);
-      structuresRef.current = structuresRef.current.concat(platform);
+      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, terrainMesh, 12);
+      structures = structures.concat(platform);
       columns.forEach(column => {
-        structuresRef.current = structuresRef.current!.concat(column);
+        structures = structures.concat(column);
       });
     }
 
     if (props.world.docks) {
-      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, terrainMeshRef.current);
-      structuresRef.current = structuresRef.current.concat(docksPlatform);
+      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, terrainMesh);
+      structures = structures.concat(docksPlatform);
     }
   
-    const townSquarePlatform = drawTownSquare(props.world, terrainMeshRef.current);
-    structuresRef.current = structuresRef.current.concat(townSquarePlatform);
+    const townSquarePlatform = drawTownSquare(props.world, terrainMesh);
+    structures = structures.concat(townSquarePlatform);
 
-    structuresRef.current.forEach((thing) => sceneRef.current!.add(thing));
+    envRef.current.setLayer("structures", structures);
   }
 
   const drawRoads = () => {
-    if (!props.world || !sceneRef.current || !roadsRef.current) return;
+    if (!props.world || !envRef.current) return;
 
-    roadsRef.current = [];
+    let roads: THREE.Line[] = [];
+
     if (props.world.templePath) {
-      roadsRef.current = roadsRef.current.concat(createPath(props.world.templePath!, props.world.heightmap));
+      roads = roads.concat(createPath(props.world.templePath!, props.world.heightmap));
     }
     if (props.world.docksPath) {
-      roadsRef.current = roadsRef.current.concat(createPath(props.world.docksPath!, props.world.heightmap));
+      roads = roads.concat(createPath(props.world.docksPath!, props.world.heightmap));
     }
 
-    roadsRef.current.forEach((roadSegments) => {
-      sceneRef.current!.add(roadSegments);
-    }) 
+    envRef.current.setLayer("roads", roads);
   }
 
   const drawStructureFlares = () => {
-    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
-    const [townSquare, temple, docks] = drawTownLocations(props.world!, terrainMeshRef.current!);
-      flaresRef.current = [townSquare, temple, docks];
-      if (townSquare) {
-        sceneRef.current.add(townSquare);
-      }
-      if (temple) {
-        sceneRef.current.add(temple);
-      }
-      if (docks) {
-        sceneRef.current.add(docks);
-      }
+    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
+    const terrainMesh = envRef.current!.layers.terrainMesh!;
+    const flares = drawTownLocations(props.world!, terrainMesh);
+    envRef.current.setLayer("flares", flares);
   };
 
   const drawWaterAccumulationDiagram = () => {
-    if (!sceneRef.current || !props.world) return;
-    waterAccumulationRef.current = createWaterAccumulationField(props.world.waterAccumulation, props.world.heightmap);
-    sceneRef.current.add(waterAccumulationRef.current);
+    if (!props.world || !envRef.current) return;
+    const waterAccumulation = createWaterAccumulationField(props.world.waterAccumulation, props.world.heightmap);
+    envRef.current.setLayer("waterAccumulation", waterAccumulation);
   }
 
   const drawTrees = () => {
-    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
-    treesGroupsRef.current = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap, props.world.waterLevel, terrainMeshRef.current!);
-    treesGroupsRef.current.forEach((treeGroup) => sceneRef.current!.add(treeGroup));
+    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
+    const terrainMesh = envRef.current!.layers.terrainMesh!;
+    const treesGroups  = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap, props.world.waterLevel, terrainMesh);
+    envRef.current.setLayer("treesGroups", treesGroups);
   }
 
   const drawFlowDiagram = () => {
-    if (!sceneRef.current || !props.world || !terrainMeshRef.current) return;
-    arrowsRef.current = createFlowDiagram(props.world.flowDirections);
-    sceneRef.current.add(arrowsRef.current);
+    if (!props.world || !envRef.current) return;
+    const arrows = createFlowDiagram(props.world.flowDirections);
+    envRef.current.setLayer("arrows", arrows);
   };
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.drawTerrain) {
       drawTerrain();
-    } else if (terrainMeshRef.current) {
-      sceneRef.current!.remove(terrainMeshRef.current);
+    } else {
+      envRef.current.removeLayer("terrainMesh");
     }
   }, [props.displayParams.drawTerrain])
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.drawWater) {
-      drawTerrain();
-    } else if (waterMeshRef.current) {
-      sceneRef.current!.remove(waterMeshRef.current);
+      drawWaterLevel();
+    } else {
+      envRef.current.removeLayer("waterMesh");
     }
   }, [props.displayParams.drawWater])
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.drawStructures) {
       drawStructures();
-    } else if (structuresRef.current) {
-      structuresRef.current.forEach((thing) => sceneRef.current!.remove(thing));
+    } else {
+      envRef.current.removeLayer("structures");
     }
   }, [props.displayParams.drawStructures])
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.drawRoads) {
       drawRoads();
-    } else if (roadsRef.current) {
-      roadsRef.current.forEach((thing) => sceneRef.current!.remove(thing));
+    } else {
+      envRef.current.removeLayer("roads");
     }
   }, [props.displayParams.drawRoads])
   
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.showStructureFlares) {
       drawStructureFlares();
-    } else if (flaresRef.current) {
-      flaresRef.current.forEach((thing) => {if (thing) sceneRef.current!.remove(thing);})
+    } else {
+      envRef.current.removeLayer("flares");
     }
   }, [props.displayParams.showStructureFlares])
 
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.showFlowDirections) {
       drawFlowDiagram();
-    } else if (arrowsRef.current) {
-      sceneRef.current!.remove(arrowsRef.current);
+    } else {
+      envRef.current.removeLayer("arrows");
     }
   }, [props.displayParams.showFlowDirections])
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.showWaterAccumulation) {
       drawWaterAccumulationDiagram();
-    } else if (waterAccumulationRef.current) {
-      sceneRef.current!.remove(waterAccumulationRef.current);
+    } else {
+      envRef.current.removeLayer("waterAccumulation");
     }
   }, [props.displayParams.showWaterAccumulation])
 
   useEffect(() =>{
+    if (!envRef.current) return;
     if (props.displayParams.showTrees) {
       drawTrees();
-    } else if (treesGroupsRef.current) {
-      treesGroupsRef.current.forEach((thing) => {if (thing) sceneRef.current!.remove(thing);})
+    } else {
+      envRef.current.removeLayer("treesGroups");
     }
   }, [props.displayParams.showTrees])
 
   useEffect(() => {
+    if (!envRef.current || !envRef.current.lighting) return;
     const ambientLight = new THREE.AmbientLight(colorConfigRef.current.ambientLight); // Soft ambient light
-    ambientLightRef.current = ambientLight;
+    envRef.current.lighting.ambientLight = ambientLight;
   }, [props.colorsConfig.ambientLight]);
 
   useEffect(() => {
+    if (!envRef.current) return;
     const directionalLight = new THREE.DirectionalLight(colorConfigRef.current.directionalLight); // Soft ambient light
-    directionalLightRef.current = directionalLight;
+    envRef.current.lighting.directionalLight = directionalLight;
   }, [props.colorsConfig.directionalLight]);
 
   useEffect(() => {
-    // Clean up previous scene, renderer, etc.
-    if (sceneRef.current) {
-      while (sceneRef.current.children.length > 0) {
-        sceneRef.current.remove(sceneRef.current.children[0]);
-      }
-    }
-
     if (!mountRef.current || !props.world || !rendererRef.current || !envRef.current) return;
+    envRef.current.emptySceneBuffer();
 
-    //console.log("Rendering world");
-
-    // Reset the clock and the camera
     envRef.current.clock = new THREE.Clock();
     envRef.current.returnToOverview();
     
-    // Refresh array refs
-    structuresRef.current = [];
-    roadsRef.current = [];
-
-    if (sceneRef.current) {
-      if (props.displayParams.drawTerrain) drawTerrain();
-      if (props.displayParams.drawWater) drawWaterLevel();
-      if (props.displayParams.drawStructures) drawStructures();
-      if (props.displayParams.drawRoads) drawRoads();
-      if (props.displayParams.showStructureFlares) drawStructureFlares();
-      if (props.displayParams.showFlowDirections) drawFlowDiagram();
-      if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
-      if (props.displayParams.showTrees) drawTrees();
-      
-      if (ambientLightRef.current) {
-        sceneRef.current.add(ambientLightRef.current);
-      }
-
-      if (directionalLightRef.current) {
-        sceneRef.current.add(directionalLightRef.current);
-      }
-    }
+    // For each layer, check if we turned it off
+    if (props.displayParams.drawTerrain) drawTerrain();
+    if (props.displayParams.drawWater) drawWaterLevel();
+    if (props.displayParams.drawStructures) drawStructures();
+    if (props.displayParams.drawRoads) drawRoads();
+    if (props.displayParams.showStructureFlares) drawStructureFlares();
+    if (props.displayParams.showFlowDirections) drawFlowDiagram();
+    if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
+    if (props.displayParams.showTrees) drawTrees();
+    
+    envRef.current.resetLights();
 
     let animationId: number;
 
@@ -341,11 +286,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       animationId = requestAnimationFrame(animate);
 
       if (envRef.current) {
-        envRef.current.advanceFrame(terrainMeshRef.current!);
+        envRef.current.advanceFrame();
       
         //console.log("Rendering scene: ", sceneRef.current);
 
-        rendererRef.current!.render(sceneRef.current!, envRef.current.camera);
+        rendererRef.current!.render(envRef.current.scene, envRef.current.camera);
       }
     };
 
@@ -403,8 +348,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
                   if (envRef.current) {
                     setCameraModeString("Free Float");
                     envRef.current.moveCameraAbovePosition(new THREE.Vector3(
-                      props.world!.townSquare.x - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
-                      (props.world!.heightmap.length - props.world!.townSquare.y) - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
+                      props.world!.townSquare.x - (envRef.current!.layers.terrainMesh!.geometry as THREE.PlaneGeometry).parameters.width / 2,
+                      (props.world!.heightmap.length - props.world!.townSquare.y) - (envRef.current!.layers.terrainMesh!.geometry as THREE.PlaneGeometry).parameters.height / 2,
                       10
                     ));
                   }
