@@ -3,12 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-import { OrbitControls } from 'three/examples/jsm/Addons.js';
-import { FPSControls } from '@/FPSControls.js';
 import { Button } from './ui/button';
 
-import * as Constants from '@/constants';
-import { ColorsConfig, DisplayParams, Point, World } from '@/types';
+import { ColorsConfig, DisplayParams, World } from '@/types';
 import { 
   drawTemple, 
   drawTownLocations, 
@@ -19,21 +16,16 @@ import {
   createWaterAccumulationField,
   createPath,
   drawDocks,
-  drawTreesOnMap,
-  intersectPlane
+  drawTreesOnMap
 } from '@/app/models';
+
+import { GameEnvironment } from '@/app/game-logic';
 
 export interface ThreeSceneProps {
   world: World | null;
   colorsConfig: ColorsConfig;
   displayParams: DisplayParams;
   handleFullscreenChange: Function;
-}
-
-enum CameraMode {
-  FreeFloat,
-  Walking,
-  FlyHack
 }
 
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
@@ -45,6 +37,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // Game environment
+  const envRef = useRef<GameEnvironment | null>(null);
+
   // Props
   const colorConfigRef = useRef(props.colorsConfig);
 
@@ -53,52 +48,15 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
 
-  // Clock
-  const clockRef = useRef<THREE.Clock | null>(null); 
-  
-  // Pointer to terrain mesh
+  // Layers for rendering
   const terrainMeshRef = useRef<THREE.Mesh | null>(null);
   const waterMeshRef = useRef<THREE.Mesh | null>(null);
-  
-  // Camera
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-
-  // Camera controls
-  const controlsRef = useRef<OrbitControls | FPSControls | null>(null);
-  const freeFloatControlsRef = useRef<OrbitControls | null>(null);
-  const pointerLockControlsRef = useRef<FPSControls | null>(null);
-
-  const cameraModeRef = useRef<CameraMode>(CameraMode.FreeFloat);
-
-  // Track refs for models that we turn on or off
   const flaresRef = useRef<(THREE.Mesh | null)[]>([]);
   const structuresRef = useRef<THREE.Mesh[]>([]);
   const roadsRef = useRef<THREE.Line[]>([]);
   const arrowsRef = useRef<THREE.Group | null>(null);
   const waterAccumulationRef = useRef<THREE.Group | null>(null);
   const treesGroupsRef = useRef<THREE.Group[]>([]);
-
-
-  const resetCamera = () => {
-    cameraRef.current!.fov = Constants.DEFAULT_FOV;
-    cameraRef.current!.aspect = Constants.DEFAULT_ASPECT;
-    cameraRef.current!.near = Constants.DEFAULT_NEAR;
-    cameraRef.current!.far = Constants.DEFAULT_FAR;
-    cameraRef.current!.position.set(0, 0, 100);
-  };
-
-
-  // Physics for free-fall
-  const gravity = 9.81; // Simulating gravity
-
-  // Input state
-  const moveForward = useRef<boolean>(false);
-  const moveBackward = useRef<boolean>(false);
-  const moveLeft = useRef<boolean>(false);
-  const moveRight = useRef<boolean>(false);
-  const canJumpRef = useRef<boolean>(false);
-  const velocityRef = useRef<THREE.Vector3>(new THREE.Vector3());
-  const directionRef = useRef<THREE.Vector3>(new THREE.Vector3());
 
   const resizeRendererToDisplaySize = () => {
     const width = mountRef.current?.clientWidth;
@@ -108,8 +66,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     rendererRef.current?.setSize(width!, height!);
     
     // Optionally, update the camera aspect ratio and projection matrix if needed
-    cameraRef.current!.aspect = width! / height!;
-    cameraRef.current!.updateProjectionMatrix();
+    envRef.current!.camera.aspect = width! / height!;
+    envRef.current!.camera.updateProjectionMatrix();
   }
 
   useEffect(() => {
@@ -121,8 +79,11 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     // Constructor: Components setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     rendererRef.current = renderer;
+ 
+    const gameEnvironment = new GameEnvironment(renderer);
+    envRef.current = gameEnvironment;
 
-    mountRef.current!.appendChild(rendererRef.current.domElement);
+    mountRef.current!.appendChild(renderer.domElement);
 
     // Constructor: Scene setup
     const scene = new THREE.Scene();
@@ -138,129 +99,25 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     sceneRef.current = scene;
 
-    // Constructor: Camera setup
-    const camera = new THREE.PerspectiveCamera(Constants.DEFAULT_FOV, Constants.DEFAULT_ASPECT, Constants.DEFAULT_NEAR, Constants.DEFAULT_FAR);
-    camera.position.set(0, 0, 100);
-    cameraRef.current = camera;
-
     resizeRendererToDisplaySize();
-
-    // Constructor: OrbitControls setup
-    const orbitControls = new OrbitControls(camera, rendererRef.current!.domElement);
-    orbitControls.enableDamping = true;
-    orbitControls.dampingFactor = 0.05;
-    freeFloatControlsRef.current = orbitControls;
-
-    // Constructor: PointerLockControls setup
-    const pointerLockControls = new FPSControls(camera, renderer.domElement);
-    pointerLockControlsRef.current = pointerLockControls;
-
-    // Handle pointer lock state changes (optional but useful for UI)
-    pointerLockControls.domElement.ownerDocument.addEventListener('lock', () => {
-      console.log('Pointer locked');
-    });
-    pointerLockControls.domElement.ownerDocument.addEventListener('unlock', () => {
-      console.log('Pointer unlocked');
-    });
 
     // Constructor: KeyEvents setup
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (!cameraRef.current || !controlsRef.current) return;
-
-      const moveSpeed = 10;
-
-      // If we're in free-float mode
-      if (controlsRef.current instanceof OrbitControls) {
-        console.log("Orbit lock movement");
-        switch (event.key) {
-          case 'w':
-            let north = new THREE.Vector3(0, 1, 0);
-            controlsRef.current.target.addScaledVector(north, moveSpeed);
-            cameraRef.current.position.addScaledVector(north, moveSpeed);
-            break;
-          case 's':
-            let south = new THREE.Vector3(0, -1, 0);
-            controlsRef.current.target.addScaledVector(south, moveSpeed);
-            cameraRef.current.position.addScaledVector(south, moveSpeed);
-            break;
-          case 'a':
-            let west = new THREE.Vector3(-1, 0, 0);
-            controlsRef.current.target.addScaledVector(west, moveSpeed);
-            cameraRef.current.position.addScaledVector(west, moveSpeed);
-            break;
-          case 'd':
-            let east = new THREE.Vector3(1, 0, 0);
-            controlsRef.current.target.addScaledVector(east, moveSpeed);
-            cameraRef.current.position.addScaledVector(east, moveSpeed);
-            break;
-        }
-        freeFloatControlsRef.current!.update();
-      } else if (controlsRef.current instanceof FPSControls) {
-        // Event listener to lock pointer when user clicks on the canvas
-        console.log(event);
-        switch (event.key) {
-          case 'w':
-            moveForward.current = true;
-            moveBackward.current = false;
-            break;
-          case 's':
-            moveBackward.current = true;
-            moveForward.current = false;
-            break;
-          case 'a':
-            moveLeft.current = true;
-            moveRight.current = false;
-            break;
-          case 'd':
-            moveRight.current = true;
-            moveLeft.current = false;
-            break;
-          case ' ':
-            //console.log("Spacebar");
-            if (canJumpRef.current) {
-              //console.log("Jumping");
-              velocityRef.current.z = moveSpeed * 2; // Jump logic (adjust as necessary)
-              canJumpRef.current = false;
-            }
-          default:
-            moveForward.current = false;
-            moveBackward.current = false;
-            moveLeft.current = false;
-            moveRight.current = false;
-            break;
-        }
-      }
+      if (!envRef.current) return;
       
+      envRef.current!.handleKeyDown(event);
     };
 
     const handleKeyUp = (event: globalThis.KeyboardEvent) => {
-      if (!controlsRef.current) return;
+      if (!envRef.current) return;
     
-      // Reset velocity when key is released
-      switch (event.key) {
-        case 'w':
-          moveForward.current = false;
-          break;
-        case 's':
-          moveBackward.current = false;
-          break;
-        case 'a':
-          moveLeft.current = false;
-          break;
-        case 'd':
-          moveRight.current = false;
-          break;
-      }
+      envRef.current!.handleKeyUp(event);
     };
 
     
     window.addEventListener('resize', resizeRendererToDisplaySize);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-
-    // Game logic: Initialize to free-float mode
-    controlsRef.current = orbitControls;
-    cameraModeRef.current = CameraMode.FreeFloat;
 
     // Return cleanup callback
     return () => {
@@ -273,10 +130,16 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
   const drawTerrain = () => {
     if (!colorConfigRef.current || !props.world || !sceneRef.current) return;
+
     const terrainMesh = generateMesh(props.world, colorConfigRef.current);
+
+    //console.log("Got terrain mesh");
+
     terrainMeshRef.current = terrainMesh;
 
     sceneRef.current.add(terrainMesh);
+
+    //console.log("Rendered terrain mesh");
   }
 
   const drawWaterLevel = () => {
@@ -441,15 +304,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       }
     }
 
-    // Go back to free-explore when we create a new world
-    cameraModeRef.current = CameraMode.FreeFloat;
-    resetCamera();
-    freeFloatControlsRef.current!.enabled = true;
+    if (!mountRef.current || !props.world || !rendererRef.current || !envRef.current) return;
 
-    if (!mountRef.current || !props.world || !rendererRef.current) return;
+    //console.log("Rendering world");
 
     // Reset the clock and the camera
-    clockRef.current = new THREE.Clock();
+    envRef.current.clock = new THREE.Clock();
+    envRef.current.returnToOverview();
     
     // Refresh array refs
     structuresRef.current = [];
@@ -465,7 +326,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
       if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
       if (props.displayParams.showTrees) drawTrees();
       
-
       if (ambientLightRef.current) {
         sceneRef.current.add(ambientLightRef.current);
       }
@@ -480,106 +340,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     const animate = () => {
       animationId = requestAnimationFrame(animate);
 
-      const delta = clockRef.current!.getDelta(); // Time between frames
-
-      // Update the camera's fall if in free-fall mode
-      if (cameraModeRef.current === CameraMode.Walking) {
-        setCameraModeString("Gravity On")
-
-        const collisionResults = intersectPlane(new THREE.Vector3(cameraRef.current!.position.x, cameraRef.current!.position.y, 999), terrainMeshRef.current!);
-        const velocity = velocityRef.current; // Assuming you have a velocity ref for FPS movement
-
-        const moveSpeed = 10;
-
-        if (collisionResults.length > 0) {
-          if (collisionResults[0].point.z > cameraRef.current!.position.z + velocityRef.current.z * delta - 0.5) {
-            //console.log("Ground is at ", collisionResults[0].point.z);
-            //console.log("You are going from ", cameraRef.current!.position.z, " to ", cameraRef.current!.position.z + velocityRef.current.z * delta,  " this frame");
-            // This will pop us out of the ground
-            cameraRef.current!.position.z = collisionResults[0].point.z + 0.5;
-
-            //console.log("We put you at ", cameraRef.current!.position.z = collisionResults[0].point.z + 0.5);
-            
-            if (velocity.z < 0.0001) {
-              //console.log("Hit ground");
-              velocity.z = 0;
-            } else {
-              //console.log("Jumping");
-              cameraRef.current!.position.z += velocity.z * delta;
-            }
-            
-            // Update velocity with delta
-            if (Math.abs(velocity.x) < 0.01) {
-              //console.log("Zeroing x velocity");
-              velocity.x = 0;  
-            } else {
-              //console.log("X friction");
-              velocity.x -= velocity.x * 10.0 * delta;
-            }
-            if (Math.abs(velocity.y) < 0.01) {
-              //console.log("Zeroing y velocity");
-              velocity.y = 0;  
-            } else {
-              //console.log("Y friction from ", velocity.y, " to ", velocity.y * 10.0 * delta);
-              velocity.y -= velocity.y * 10.0 * delta;
-            }
-            
-
-            // Update movement direction based on user input (WASD keys)
-            if (moveForward.current) velocity.y += moveSpeed * delta;
-            if (moveBackward.current) velocity.y -= moveSpeed * delta;
-            if (moveLeft.current) velocity.x -= moveSpeed * delta;
-            if (moveRight.current) velocity.x += moveSpeed * delta;
-
-            // We can jump if we are on the ground
-            canJumpRef.current = true;
-          } else {
-            //console.log("Falling");
-            cameraRef.current!.position.z += velocity.z * delta;
-            velocity.z -= gravity * delta; // Increase fall speed due to gravity
-          }
-        }
-    
-        // Apply movement to the PointerLockControls
-        (controlsRef.current as FPSControls).moveRight(velocity.x * delta);
-        (controlsRef.current as FPSControls).moveForward(-1 * velocity.y * delta);
-        
-      } else if (cameraModeRef.current === CameraMode.FlyHack) {
-        setCameraModeString("Fly-Hack");
-        const moveSpeed = 10;
-        // Apply velocity and movement for PointerLockControls
-        const velocity = velocityRef.current; // Assuming you have a velocity ref for FPS movement
-        const direction = directionRef.current; // Assuming you have a direction ref for FPS movement
-    
-        // Update velocity with delta
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.y -= velocity.y * 10.0 * delta;
-    
-        // Update movement direction based on user input (WASD keys)
-        if (moveForward.current) velocity.y += moveSpeed * delta;
-        if (moveBackward.current) velocity.y -= moveSpeed * delta;
-        if (moveLeft.current) velocity.x -= moveSpeed * delta;
-        if (moveRight.current) velocity.x += moveSpeed * delta;
-    
-        // Apply movement to the PointerLockControls
-        (controlsRef.current as FPSControls).moveRight(velocity.x * delta);
-        (controlsRef.current as FPSControls).moveForward(-1 * velocity.y * delta);
-    
-        // // Optional: Handle gravity or jumping
-        // if (cameraRef.current.position.y < 10) {
-        //   cameraRef.current.position.y = 10; // Prevent camera from going below ground level
-        //   velocity.y = 0; // Stop vertical movement
-        // }
-    
-        // // You can also add vertical movement for jumping or falling here
-        // cameraRef.current.position.y += velocity.y * delta;
-      } 
-      else if (cameraModeRef.current === CameraMode.FreeFloat) {
-        setCameraModeString("Free Float");
-        freeFloatControlsRef.current!.update();
-      }
+      if (envRef.current) {
+        envRef.current.advanceFrame(terrainMeshRef.current!);
       
-      rendererRef.current!.render(sceneRef.current!, cameraRef.current!);
+        //console.log("Rendering scene: ", sceneRef.current);
+
+        rendererRef.current!.render(sceneRef.current!, envRef.current.camera);
+      }
     };
 
     animate();
@@ -587,47 +354,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     return () => cancelAnimationFrame(animationId);
 
   }, [props.world]);
-  
-  const handleResetView = () => {
-    if (cameraRef.current && controlsRef.current) {
-      resetCamera();
-      cameraModeRef.current = CameraMode.FreeFloat;
-      cameraRef.current.updateProjectionMatrix();
-      freeFloatControlsRef.current!.reset();
-      freeFloatControlsRef.current!.enabled = true;
-      controlsRef.current = freeFloatControlsRef.current!;
-
-      rendererRef.current!.domElement.removeEventListener('click', () => {
-        if (controlsRef.current instanceof FPSControls) {
-          pointerLockControlsRef.current!.lock();
-        }
-      });
-    }
-  };
-
-  // Function to move the camera directly above the town square
-  const moveCameraAboveTownSquare = () => {
-    if (!cameraRef.current || !controlsRef.current || !props.world || !terrainMeshRef.current) return;
-
-    const townSquarePosition = new THREE.Vector3(
-      props.world!.townSquare.x - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
-      (props.world.heightmap.length - props.world!.townSquare.y) - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
-      10 // Z position above the ground
-    );
-    cameraModeRef.current = CameraMode.FreeFloat;
-    controlsRef.current = freeFloatControlsRef.current;
-    cameraRef.current.position.set(townSquarePosition.x, townSquarePosition.y, 50); // Adjust the Z position for height
-    freeFloatControlsRef.current!.target.copy(townSquarePosition); // Set the controls' target to the town square
-    freeFloatControlsRef.current!.update();
-    pointerLockControlsRef.current!.unlock();
-    freeFloatControlsRef.current!.enabled = true;
-
-    rendererRef.current!.domElement.removeEventListener('click', () => {
-      if (controlsRef.current instanceof FPSControls) {
-        pointerLockControlsRef.current!.lock();
-      }
-    });
-  };
 
   const onFullscreenClick = () => {
     return;
@@ -640,8 +366,6 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     setIsFullscreen(shouldBeFullscreen);
     props.handleFullscreenChange(shouldBeFullscreen);
   }
-
-  
 
   return (
     <div ref={containerRef} id='three-container' tabIndex={0} className='p-4 flex-1'>
@@ -666,37 +390,42 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
         <div id="buttons-container" className='relative'>
           <div className='flex p-4 absolute bottom-1 left-1 z-10'>
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
-                onClick={handleResetView}>
+                onClick={() => {
+                  if (envRef.current) {
+                    setCameraModeString("Free Float");
+                    envRef.current.returnToOverview();
+                  }
+                }}>
                 🗺️
               </Button>
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
-                onClick={moveCameraAboveTownSquare}>
+                onClick={() => {
+                  if (envRef.current) {
+                    setCameraModeString("Free Float");
+                    envRef.current.moveCameraAbovePosition(new THREE.Vector3(
+                      props.world!.townSquare.x - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.width / 2,
+                      (props.world!.heightmap.length - props.world!.townSquare.y) - (terrainMeshRef.current!.geometry as THREE.PlaneGeometry).parameters.height / 2,
+                      10
+                    ));
+                  }
+                }}>
                 🏘️
               </Button>
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
                 onClick={() => {
-                  freeFloatControlsRef.current!.enabled = false;
-                  controlsRef.current = pointerLockControlsRef.current;
-            
-                  rendererRef.current!.domElement.addEventListener('click', () => {
-                    if (controlsRef.current instanceof FPSControls) {
-                      pointerLockControlsRef.current!.lock();
-                    }
-                  });
-                  cameraModeRef.current = CameraMode.Walking;
+                  if (envRef.current) {
+                    setCameraModeString("Gravity On");
+                    envRef.current.turnGravityOn();
+                  }
                 }}>
                 🪂
               </Button>
               <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
                 onClick={() => {
-                  freeFloatControlsRef.current!.enabled = false;
-                  rendererRef.current!.domElement.addEventListener('click', () => {
-                    if (controlsRef.current instanceof FPSControls) {
-                      pointerLockControlsRef.current!.lock();
-                    }
-                  });
-                  cameraModeRef.current = CameraMode.FlyHack;
-                  controlsRef.current = pointerLockControlsRef.current;
+                  if (envRef.current) {
+                    setCameraModeString("Fly-Hack");
+                    envRef.current.turnFlyHackOn();
+                  }
                 }}>
                 🛩️
               </Button>

@@ -190,17 +190,6 @@ export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THRE
 export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
   const canvasSize = world.heightmap.length;
 
-  // Optional: color water vertices
-  // const displayThreshold = 0.05;
-
-  // let scaler = 0;
-  // for (let x = 0; x < canvasSize; x++) {
-  //   for (let y = 0; y < canvasSize; y++) { 
-  //     if (world.waterAccumulation[x][y] === null) continue;
-  //     if (world.waterAccumulation[x][y] > scaler) scaler = world.waterAccumulation[x][y];
-  //   }
-  // }
-
   const geometry = new THREE.PlaneGeometry(
     canvasSize,
     canvasSize,
@@ -232,9 +221,11 @@ export const generateMesh = (world: World, colorsConfig: ColorsConfig) => {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
 
-  const material = new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    flatShading: true,
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,  // Use vertex colors from the geometry
+    roughness: 0.8,      // High roughness for a matte look (values between 0 and 1)
+    metalness: 0.0,      // Set to 0 for non-metallic surfaces like rock or grass
+    flatShading: true,   // Optional, keeps the shading sharp between faces for a less smooth surface
   });
 
   const retMesh = new THREE.Mesh(geometry, material);
@@ -365,11 +356,11 @@ export const createPath = (points: Point[], heightmap: HeightMap) => {
   return new THREE.Line(geometry, material);
 }
 
-export const drawTree = (treeCoords: Point, basePosition: THREE.Vector3, waterFraction: number) => {
+export const drawTree = (basePosition: THREE.Vector3, waterFraction: number) => {
   let ret = new THREE.Group();
 
   // Create the tree trunk
-  const trunkGeometry = new THREE.CylinderGeometry(0.02 + 0.05 * waterFraction, 0.03 + 0.05 * waterFraction, 0.5, 6); // Cylinder (trunk) with a hexagonal base
+  const trunkGeometry = new THREE.CylinderGeometry(0.02 + 0.05 * waterFraction, 0.03 + 0.05 * waterFraction, 1.5, 6); // Cylinder (trunk) with a hexagonal base
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown color for the trunk
   const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
   trunk.position.set(basePosition.x, basePosition.y, basePosition.z); // Raise the trunk above the ground
@@ -380,12 +371,12 @@ export const drawTree = (treeCoords: Point, basePosition: THREE.Vector3, waterFr
   const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Green color for the leaves
 
   const foliageGeometries = [
-      new THREE.ConeGeometry(0.25 + 0.25 * waterFraction, 0.15 + 0.15 * waterFraction, 5), // Lower cone
-      new THREE.ConeGeometry(0.2 + 0.2 * waterFraction, 0.18 + 0.18 * waterFraction, 5), // Middle cone
-      new THREE.ConeGeometry(0.15 + 0.15 * waterFraction, 0.1 + 0.1 * waterFraction, 5) // Top cone
+      new THREE.ConeGeometry(0.25 + 0.25 * waterFraction, 0.25 + 0.2 * waterFraction, 5), // Lower cone
+      new THREE.ConeGeometry(0.2 + 0.2 * waterFraction, 0.25 + 0.2 * waterFraction, 5), // Middle cone
+      new THREE.ConeGeometry(0.15 + 0.15 * waterFraction, 0.2 + 0.15 * waterFraction, 5) // Top cone
   ];
 
-  const foliagePositions = [0.1 + 0.4 * waterFraction, 0.2 + 0.4 * waterFraction, 0.3 + 0.4 * waterFraction]; // Y-positions for the foliage
+  const foliagePositions = [0.6 + 0.4 * waterFraction, 0.8 + 0.4 * waterFraction, 1.0 + 0.4 * waterFraction]; // Y-positions for the foliage
 
   foliageGeometries.forEach((geometry, index) => {
       const foliage = new THREE.Mesh(geometry, foliageMaterial);
@@ -428,7 +419,7 @@ export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightma
 
         if (treeBaseHeight < waterLevel * 10) continue;
 
-        ret = ret.concat(drawTree({x: x, y: y}, new THREE.Vector3(treeBaseX, treeBaseY, treeBaseHeight), waterFraction));
+        ret = ret.concat(drawTree(new THREE.Vector3(treeBaseX, treeBaseY, treeBaseHeight), waterFraction));
       }
     }
   }
