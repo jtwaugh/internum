@@ -49,8 +49,8 @@ const EMPTY_LAYERS = {
     treesGroups: []
 }
 
-type LayerType = THREE.Mesh | THREE.Line | THREE.Group;
-type LayerObject = LayerType | (LayerType | null)[];
+export type LayerType = THREE.Mesh | THREE.Line | THREE.Group;
+export type LayerObject = LayerType | (LayerType | null)[];
 
 export class GameEnvironment {
     clock: THREE.Clock;

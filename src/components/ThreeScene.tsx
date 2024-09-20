@@ -19,7 +19,9 @@ import {
   drawTreesOnMap
 } from '@/app/models';
 
-import { GameEnvironment } from '@/app/game-logic';
+import { GameEnvironment, LayerObject } from '@/app/game-logic';
+
+type LayerTogglesConfig = { [name: string]:  {condition: boolean, drawFn: Function, removeFn: Function} }
 
 export interface ThreeSceneProps {
   world: World | null;
@@ -97,157 +99,109 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
-  const drawTerrain = () => {
-    if (!colorConfigRef.current || !props.world || !envRef.current) return;
-    // Set the layer and its ref equal to a newly-generated terrain mesh
-    const terrainMesh = generateMesh(props.world, colorConfigRef.current);
-    envRef.current.setLayer("terrainMesh", terrainMesh);
-  }
-
-  const drawWaterLevel = () => {
-    if (!colorConfigRef.current || !props.world || !envRef.current) return;
-    const waterMesh = generateWaterMesh(props.world.waterLevel, props.world.heightmap.length, colorConfigRef.current);
-    envRef.current.setLayer("waterMesh", waterMesh);
-  }
-
-  const drawStructures = () => {
-    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
-
-    const terrainMesh = envRef.current!.layers.terrainMesh!;
-    let structures: THREE.Mesh[] = [];
-
-    if (props.world.temple) {
-      const [platform, columns] = drawTemple(props.world.temple, props.world.heightmap, terrainMesh, 12);
-      structures = structures.concat(platform);
-      columns.forEach(column => {
-        structures = structures.concat(column);
-      });
-    }
-
-    if (props.world.docks) {
-      const docksPlatform = drawDocks(props.world.docks, props.world.heightmap, terrainMesh);
-      structures = structures.concat(docksPlatform);
-    }
+  const drawFunctions : {[layerName: string]: (() => LayerObject | undefined)} = {
+    terrainMesh: () => {
+      if (!colorConfigRef.current) return;
+      const terrainMesh = generateMesh(props.world!, colorConfigRef.current);
+      return terrainMesh;
+    },
+    waterMesh: () => {
+      if (!colorConfigRef.current) return;
+      const waterMesh = generateWaterMesh(props.world!.waterLevel, props.world!.heightmap.length, colorConfigRef.current);
+      return waterMesh;
+    },
+    structures: () => {
+      if (!envRef.current!.layers.terrainMesh) return;
+      const terrainMesh = envRef.current!.layers.terrainMesh!;
+      let structures: THREE.Mesh[] = [];
   
-    const townSquarePlatform = drawTownSquare(props.world, terrainMesh);
-    structures = structures.concat(townSquarePlatform);
-
-    envRef.current.setLayer("structures", structures);
-  }
-
-  const drawRoads = () => {
-    if (!props.world || !envRef.current) return;
-
-    let roads: THREE.Line[] = [];
-
-    if (props.world.templePath) {
-      roads = roads.concat(createPath(props.world.templePath!, props.world.heightmap));
+      if (props.world!.temple) {
+        const [platform, columns] = drawTemple(props.world!.temple, props.world!.heightmap, terrainMesh, 12);
+        structures = structures.concat(platform);
+        columns.forEach(column => structures = structures.concat(column));
+      }
+  
+      if (props.world!.docks) {
+        const docksPlatform = drawDocks(props.world!.docks, props.world!.heightmap, terrainMesh);
+        structures = structures.concat(docksPlatform);
+      }
+  
+      const townSquarePlatform = drawTownSquare(props.world!, terrainMesh);
+      structures = structures.concat(townSquarePlatform);
+      return structures;
+    },
+    roads: () => {
+      let roads: THREE.Line[] = [];
+  
+      if (props.world!.templePath) {
+        roads = roads.concat(createPath(props.world!.templePath!, props.world!.heightmap));
+      }
+      if (props.world!.docksPath) {
+        roads = roads.concat(createPath(props.world!.docksPath!, props.world!.heightmap));
+      }
+  
+      return roads;
+    },
+    flares: () => {
+      if (!envRef.current!.layers.terrainMesh) return;
+      const terrainMesh = envRef.current!.layers.terrainMesh!;
+      const flares = drawTownLocations(props.world!, terrainMesh);
+      return flares;
+    },
+    waterAccumulation: () => {
+      const waterAccumulation = createWaterAccumulationField(props.world!.waterAccumulation, props.world!.heightmap);
+      return waterAccumulation;
+    },
+    treesGroups: () => {
+      if (!envRef.current!.layers.terrainMesh) return;
+      const terrainMesh = envRef.current!.layers.terrainMesh!;
+      const treesGroups = drawTreesOnMap(props.world!.waterAccumulation, props.world!.heightmap, props.world!.waterLevel, terrainMesh);
+      return treesGroups;
+    },
+    arrows: () => {
+      const arrows = createFlowDiagram(props.world!.flowDirections);
+      return arrows;
     }
-    if (props.world.docksPath) {
-      roads = roads.concat(createPath(props.world.docksPath!, props.world.heightmap));
-    }
-
-    envRef.current.setLayer("roads", roads);
-  }
-
-  const drawStructureFlares = () => {
-    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
-    const terrainMesh = envRef.current!.layers.terrainMesh!;
-    const flares = drawTownLocations(props.world!, terrainMesh);
-    envRef.current.setLayer("flares", flares);
   };
 
-  const drawWaterAccumulationDiagram = () => {
+  const drawLayer = (layerName: string) => {
     if (!props.world || !envRef.current) return;
-    const waterAccumulation = createWaterAccumulationField(props.world.waterAccumulation, props.world.heightmap);
-    envRef.current.setLayer("waterAccumulation", waterAccumulation);
+    envRef.current!.setLayer(layerName, drawFunctions[layerName]()!);
   }
 
-  const drawTrees = () => {
-    if (!props.world || !envRef.current || !envRef.current!.layers.terrainMesh) return;
-    const terrainMesh = envRef.current!.layers.terrainMesh!;
-    const treesGroups  = drawTreesOnMap(props.world.waterAccumulation, props.world.heightmap, props.world.waterLevel, terrainMesh);
-    envRef.current.setLayer("treesGroups", treesGroups);
-  }
+  // List of layer details: flag, draw function, and layer name for removal
+  const layerConfig = [
+    { flag: props.displayParams.drawTerrain, layer: "terrainMesh" },
+    { flag: props.displayParams.drawWater, layer: "waterMesh" },
+    { flag: props.displayParams.drawStructures, layer: "structures" },
+    { flag: props.displayParams.drawRoads, layer: "roads" },
+    { flag: props.displayParams.showStructureFlares, layer: "flares" },
+    { flag: props.displayParams.showFlowDirections, layer: "arrows" },
+    { flag: props.displayParams.showWaterAccumulation, layer: "waterAccumulation" },
+    { flag: props.displayParams.showTrees, layer: "treesGroups" }
+  ];
 
-  const drawFlowDiagram = () => {
-    if (!props.world || !envRef.current) return;
-    const arrows = createFlowDiagram(props.world.flowDirections);
-    envRef.current.setLayer("arrows", arrows);
-  };
-
-  useEffect(() =>{
+  // Single useEffect hook to handle all layers
+  useEffect(() => {
     if (!envRef.current) return;
-    if (props.displayParams.drawTerrain) {
-      drawTerrain();
-    } else {
-      envRef.current.removeLayer("terrainMesh");
-    }
-  }, [props.displayParams.drawTerrain])
 
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.drawWater) {
-      drawWaterLevel();
-    } else {
-      envRef.current.removeLayer("waterMesh");
-    }
-  }, [props.displayParams.drawWater])
-
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.drawStructures) {
-      drawStructures();
-    } else {
-      envRef.current.removeLayer("structures");
-    }
-  }, [props.displayParams.drawStructures])
-
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.drawRoads) {
-      drawRoads();
-    } else {
-      envRef.current.removeLayer("roads");
-    }
-  }, [props.displayParams.drawRoads])
-  
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.showStructureFlares) {
-      drawStructureFlares();
-    } else {
-      envRef.current.removeLayer("flares");
-    }
-  }, [props.displayParams.showStructureFlares])
-
-
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.showFlowDirections) {
-      drawFlowDiagram();
-    } else {
-      envRef.current.removeLayer("arrows");
-    }
-  }, [props.displayParams.showFlowDirections])
-
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.showWaterAccumulation) {
-      drawWaterAccumulationDiagram();
-    } else {
-      envRef.current.removeLayer("waterAccumulation");
-    }
-  }, [props.displayParams.showWaterAccumulation])
-
-  useEffect(() =>{
-    if (!envRef.current) return;
-    if (props.displayParams.showTrees) {
-      drawTrees();
-    } else {
-      envRef.current.removeLayer("treesGroups");
-    }
-  }, [props.displayParams.showTrees])
+    layerConfig.forEach(({ flag, layer }) => {
+      if (flag) {
+        drawLayer(layer);
+      } else {
+        envRef.current?.removeLayer(layer);
+      }
+    });
+  }, [
+    props.displayParams.drawTerrain,
+    props.displayParams.drawWater,
+    props.displayParams.drawStructures,
+    props.displayParams.drawRoads,
+    props.displayParams.showStructureFlares,
+    props.displayParams.showFlowDirections,
+    props.displayParams.showWaterAccumulation,
+    props.displayParams.showTrees
+  ]);
 
   useEffect(() => {
     if (!envRef.current || !envRef.current.lighting) return;
@@ -268,15 +222,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     envRef.current.clock = new THREE.Clock();
     envRef.current.returnToOverview();
     
-    // For each layer, check if we turned it off
-    if (props.displayParams.drawTerrain) drawTerrain();
-    if (props.displayParams.drawWater) drawWaterLevel();
-    if (props.displayParams.drawStructures) drawStructures();
-    if (props.displayParams.drawRoads) drawRoads();
-    if (props.displayParams.showStructureFlares) drawStructureFlares();
-    if (props.displayParams.showFlowDirections) drawFlowDiagram();
-    if (props.displayParams.showWaterAccumulation) drawWaterAccumulationDiagram();
-    if (props.displayParams.showTrees) drawTrees();
+    // Draw each layer
+    layerConfig.forEach(({ flag, layer }) => {if (flag) { drawLayer(layer);}});
     
     envRef.current.resetLights();
 
