@@ -10,7 +10,8 @@ import {
     createPath,
     drawDocks,
     drawTreesOnMap,
-    drawSheep
+    drawSheep,
+    drawSheepOnMap
 } from '@/app/models';
 import { ColorsConfig, DisplayParams, LayerObject, World } from '@/types';
 import { GameEnvironment } from '@/app/game-logic';
@@ -117,8 +118,9 @@ export class SceneManager {
           return arrows;
         },
         mobs: () => {
-            const sheep = drawSheep(new THREE.Vector3(0, 0, 10));
-            return [sheep];
+            const terrainMesh = this.env.layers.terrainMesh!;
+            const sheep = drawSheepOnMap(this.world.heightmap, this.world.waterLevel, terrainMesh);
+            return sheep;
           }
       };
 

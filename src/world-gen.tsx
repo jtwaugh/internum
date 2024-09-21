@@ -178,14 +178,14 @@ const getRandomInt = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-export const getRandomLandTile = (heightmap: number[][], params: WorldGenParams): { x: number; y: number } => {
+export const getRandomLandTile = (heightmap: number[][], waterLevel: number): { x: number; y: number } => {
   const size = heightmap.length;
   const landTiles: Array<{ x: number; y: number }> = [];
 
   // Gather all land tiles (tiles that are not underwater)
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
-      if (heightmap[x][y] > params.threshold) {
+      if (heightmap[x][y] > waterLevel) {
         landTiles.push({ x, y });
       }
     }
@@ -202,6 +202,32 @@ export const getRandomLandTile = (heightmap: number[][], params: WorldGenParams)
   const townSquareTile = landTiles[randomIndex];
 
   return townSquareTile;
+};
+
+export const getRandomLandTilesInRadius = (heightmap: number[][], waterLevel: number, center: Point, radius: number, sampleSize: number): Point[] => {
+  const landTiles: Array<{ x: number; y: number }> = [];
+
+  // Gather all land tiles (tiles that are not underwater)
+  for (let x = -radius; x < radius; x++) {
+    for (let y = -radius; y < radius; y++) {
+      if (y * y + x * x > radius * radius) continue;
+      
+      if (heightmap[x + center.x][y + center.y] > waterLevel) {
+        landTiles.push({ x: x + center.x, y: y + center.y });
+      }
+    }
+  }
+
+  // Pick a random land tile
+  const pickTile = () => {
+    return landTiles[getRandomInt(0, landTiles.length - 1)];
+  }
+  
+  let ret: Point[] = [];
+  for (let i = 0; i < sampleSize; i += 1) {
+    ret = ret.concat(pickTile());
+  }
+  return ret;
 };
 
 export const findHighestPoint = (heightmap: number[][], center: { x: number; y: number }, minRadius: number, maxRadius: number): { x: number; y: number } => {

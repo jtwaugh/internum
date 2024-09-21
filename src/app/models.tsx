@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import { ColorsConfig, World, Point, HeightMap, WaterAccumulationMap } from '@/types';
+import { getRandomLandTile, getRandomLandTilesInRadius } from '@/world-gen';
 import * as Constants from '@/constants';
 
 export const intersectPlane = (position: THREE.Vector3, planeMesh: THREE.Mesh): THREE.Intersection[] => {
@@ -428,13 +429,16 @@ export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightma
 }
 
 export const drawSheep = (basePosition: THREE.Vector3) => {
+  const scale = 0.2;
+
   // Create the main icosahedron body
   const bodyMaterial = new THREE.MeshBasicMaterial({ color: Constants.DEFAULT_SHEEP_WHITE_COLOR, wireframe: false });
-  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), bodyMaterial);
+  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1 * scale, 0), bodyMaterial);
+  body.position.set(basePosition.x, basePosition.y, basePosition.z + 0.8 * scale);
+
   const headMaterial = new THREE.MeshBasicMaterial({ color: Constants.DEFAULT_SHEEP_BLACK_COLOR, wireframe: false });
-  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), headMaterial);
-  body.position.set(basePosition.x, basePosition.y, basePosition.z + 0.6);
-  head.position.set(basePosition.x + 0.5, basePosition.y, basePosition.z + 0.7);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 * scale, 0), headMaterial);
+  head.position.set(basePosition.x + 1 * scale, basePosition.y, basePosition.z + 1 * scale);
 
   // Function to create cylindrical legs
   const createLeg = (radiusTop: number, radiusBottom: number, height: number, radialSegments: number, color: string) => {
@@ -446,16 +450,16 @@ export const drawSheep = (basePosition: THREE.Vector3) => {
   }
 
   // Create four legs and position them relative to the icosahedron
-  const leg1 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
-  const leg2 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
-  const leg3 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
-  const leg4 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg1 = createLeg(0.2 * scale, 0.2 * scale, 0.75 * scale, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg2 = createLeg(0.2 * scale, 0.2 * scale, 0.75* scale, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg3 = createLeg(0.2 * scale, 0.2 * scale, 0.75* scale, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg4 = createLeg(0.2 * scale, 0.2 * scale, 0.75* scale, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
 
   // Position each leg around the icosahedron
-  leg1.position.set(basePosition.x -0.5, basePosition.y -0.5, basePosition.z);
-  leg2.position.set(basePosition.x + 0.5, basePosition.y -0.5, basePosition.z);
-  leg3.position.set(basePosition.x -0.5, basePosition.y + 0.5, basePosition.z);
-  leg4.position.set(basePosition.x + 0.5, basePosition.y + 0.5, basePosition.z);
+  leg1.position.set(basePosition.x -0.5 * scale, basePosition.y - 0.3 * scale, basePosition.z);
+  leg2.position.set(basePosition.x + 0.5 * scale, basePosition.y - 0.3 * scale, basePosition.z);
+  leg3.position.set(basePosition.x -0.5 * scale, basePosition.y + 0.3 * scale, basePosition.z);
+  leg4.position.set(basePosition.x + 0.5 * scale, basePosition.y + 0.3 * scale, basePosition.z);
 
   const appendages = [body, head, leg1, leg2, leg3, leg4];
 
@@ -465,3 +469,36 @@ export const drawSheep = (basePosition: THREE.Vector3) => {
 
   return sheep;
 };
+
+
+export const drawSheepOnMap = (heightmap: HeightMap, waterLevel: number, mesh: THREE.Mesh): THREE.Group[] => {
+  const size = heightmap.length;
+  const SKY_HEIGHT = 9001;
+  let ret: THREE.Group[] = [];
+
+  for (let flockNumber = 0; flockNumber < 10; flockNumber += 1) {
+    const flockCenter = getRandomLandTile(heightmap, waterLevel);
+
+    const flockSpawnPoints = getRandomLandTilesInRadius(heightmap, waterLevel, flockCenter, 5, 5);
+
+    for (let i = 0; i < flockSpawnPoints.length; i += 1) {
+      const tile = flockSpawnPoints[i];
+      const sheepBaseX = Math.random() + tile.x  - heightmap.length / 2;
+      const sheepBaseY = Math.random() + (heightmap.length - tile.y) - heightmap.length / 2
+
+      const groundCollision = intersectPlane(new THREE.Vector3(sheepBaseX, sheepBaseY, SKY_HEIGHT), mesh);
+
+      if (groundCollision.length !== 1) continue;
+
+      const treeBaseHeight = groundCollision[0].point.z;
+
+      if (treeBaseHeight < waterLevel * 10) continue;
+
+      ret = ret.concat(drawSheep(new THREE.Vector3(sheepBaseX, sheepBaseY, treeBaseHeight)));
+
+    }
+    
+  }
+
+  return ret;
+}

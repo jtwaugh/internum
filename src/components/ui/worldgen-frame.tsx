@@ -121,7 +121,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     }
     
 
-    const townSquarePosition = getRandomLandTile(erodedHeightmap, params);
+    const townSquarePosition = getRandomLandTile(erodedHeightmap, params.waterLevel);
 
     //console.log("town square coords: ", townSquarePosition);
 

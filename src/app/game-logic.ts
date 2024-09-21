@@ -291,8 +291,6 @@ export class GameEnvironment {
                 collisionResults = intersectPlane(new THREE.Vector3(this.camera.position.x, this.camera.position.y, 999), this.layers.terrainMesh!);
             }
     
-            const moveSpeed = 10;
-    
             if (collisionResults.length > 0) {
                 if (collisionResults[0].point.z > this.camera.position.z + this.velocity.z * delta - 0.5) {
                 //console.log("Ground is at ", collisionResults[0].point.z);
@@ -328,10 +326,10 @@ export class GameEnvironment {
                 
     
                 // Update movement direction based on user input (WASD keys)
-                if (this.input.moveForward) this.velocity.y += moveSpeed * delta;
-                if (this.input.moveBackward) this.velocity.y -= moveSpeed * delta;
-                if (this.input.moveLeft) this.velocity.x -= moveSpeed * delta;
-                if (this.input.moveRight) this.velocity.x += moveSpeed * delta;
+                if (this.input.moveForward) this.velocity.y += this.moveSpeed * delta;
+                if (this.input.moveBackward) this.velocity.y -= this.moveSpeed * delta;
+                if (this.input.moveLeft) this.velocity.x -= this.moveSpeed * delta;
+                if (this.input.moveRight) this.velocity.x += this.moveSpeed * delta;
     
                 // We can jump if we are on the ground
                 this.input.canJump = true;
@@ -352,10 +350,10 @@ export class GameEnvironment {
             this.velocity.y -= this.velocity.y * 10.0 * delta;
     
             // Update movement direction based on user input (WASD keys)
-            if (this.input.moveForward) this.velocity.y += this.moveSpeed * delta;
-            if (this.input.moveBackward) this.velocity.y -= this.moveSpeed * delta;
-            if (this.input.moveLeft) this.velocity.x -= this.moveSpeed * delta;
-            if (this.input.moveRight) this.velocity.x += this.moveSpeed * delta;
+            if (this.input.moveForward) this.velocity.y += this.moveSpeed * delta * 30;
+            if (this.input.moveBackward) this.velocity.y -= this.moveSpeed * delta * 30;
+            if (this.input.moveLeft) this.velocity.x -= this.moveSpeed * delta * 30;
+            if (this.input.moveRight) this.velocity.x += this.moveSpeed * delta * 30;
     
             // Apply movement to the PointerLockControls
             (this.controls as FPSControls).moveRight(this.velocity.x * delta);
