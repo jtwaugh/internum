@@ -1,3 +1,5 @@
+import * as THREE from "three";
+
 export type Point = { x: number, y: number };
 export type HeightMap = number[][];
 export type SlopeMap = (number | null)[][];
@@ -46,5 +48,44 @@ export interface DisplayParams {
   showFlowDirections: boolean;
   showWaterAccumulation: boolean;
   showTrees: boolean;
+  showMobs: boolean;
+
+  [key: string]: boolean;
 }
 
+export interface InputState {
+  moveForward: boolean;
+  moveBackward: boolean;
+  moveLeft: boolean;
+  moveRight: boolean;
+  canJump: boolean;
+}
+
+export interface GameEnvironmentLighting {
+  ambientLight: THREE.AmbientLight;
+  directionalLight: THREE.DirectionalLight;
+}
+
+export interface GameEnvironmentLayers {
+   terrainMesh: THREE.Mesh | null;
+   waterMesh: THREE.Mesh | null;
+   flares: (THREE.Mesh | null)[];
+   structures: THREE.Mesh[];
+   roads: THREE.Line[];
+   arrows: THREE.Group | null;
+   waterAccumulation: THREE.Group | null;
+   treesGroups: THREE.Group[];
+   mobs: THREE.Group[];
+
+  [key: string]: THREE.Mesh | THREE.Line | THREE.Group | (THREE.Mesh | null)[] | THREE.Mesh[] | THREE.Line[] | THREE.Group[] | null;
+}
+
+export type LayerTogglesConfig = { [name: string]:  {condition: boolean, drawFn: Function, removeFn: Function} }
+export type LayerType = THREE.Mesh | THREE.Line | THREE.Group;
+export type LayerObject = LayerType | (LayerType | null)[];
+
+export enum CameraMode {
+  FreeFloat,
+  Walking,
+  FlyHack
+}

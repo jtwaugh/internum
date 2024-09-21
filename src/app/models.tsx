@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { ColorsConfig, World, Point, HeightMap, WaterAccumulationMap } from '@/types';
-import { MESH_THICKNESS, DIRECTION_OFFSETS } from '@/constants';
+import * as Constants from '@/constants';
 
 export const intersectPlane = (position: THREE.Vector3, planeMesh: THREE.Mesh): THREE.Intersection[] => {
   const down = new THREE.Vector3(0, 0, -1);
@@ -40,7 +40,7 @@ export const drawTownLocations = (world: World, mesh: THREE.Mesh) => {
     const townSquarePosition = new THREE.Vector3(
       world.townSquare.x - geometry.parameters.width / 2,
       (world.heightmap.length - world.townSquare.y) - geometry.parameters.height / 2,
-      world.heightmap[world.townSquare.x][(world.heightmap.length - world.townSquare.y)] * MESH_THICKNESS
+      world.heightmap[world.townSquare.x][(world.heightmap.length - world.townSquare.y)] * Constants.MESH_THICKNESS
     );
 
     let docksLine = null;
@@ -48,7 +48,7 @@ export const drawTownLocations = (world: World, mesh: THREE.Mesh) => {
       const docksPosition = new THREE.Vector3(
         world.docks.x - geometry.parameters.width / 2,
         (world.heightmap.length - world.docks.y) - geometry.parameters.height / 2,
-        world.heightmap[world.docks.x][(world.heightmap.length - world.docks.y)] * MESH_THICKNESS
+        world.heightmap[world.docks.x][(world.heightmap.length - world.docks.y)] * Constants.MESH_THICKNESS
       );
 
       const docksTop = new THREE.Vector3(
@@ -65,7 +65,7 @@ export const drawTownLocations = (world: World, mesh: THREE.Mesh) => {
       const templePosition = new THREE.Vector3(
         world.temple.x - geometry.parameters.width / 2,
         (world.heightmap.length - world.temple.y) - geometry.parameters.height / 2,
-        world.heightmap[world.temple.x][(world.heightmap.length - world.temple.y)] * MESH_THICKNESS
+        world.heightmap[world.temple.x][(world.heightmap.length - world.temple.y)] * Constants.MESH_THICKNESS
       );
 
       const templeTop = new THREE.Vector3(
@@ -94,7 +94,7 @@ export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THRE
   const templePosition = new THREE.Vector3(
     templeCoords.x - geometry.parameters.width / 2,
     (heightmap.length - templeCoords.y) - geometry.parameters.height / 2,
-    heightmap[templeCoords.x][templeCoords.y] * MESH_THICKNESS
+    heightmap[templeCoords.x][templeCoords.y] * Constants.MESH_THICKNESS
   );
 
   const marbleMaterial = new THREE.MeshStandardMaterial({ color: 0xfff0ee, roughness: 0.5, metalness: 0.1 });
@@ -134,7 +134,7 @@ export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THRE
     const townSquarePosition = new THREE.Vector3(
       world.townSquare.x - geometry.parameters.width / 2,
       (world.heightmap.length - world.townSquare.y) - geometry.parameters.height / 2,
-      world.heightmap[world.townSquare.x][world.townSquare.y] * MESH_THICKNESS
+      world.heightmap[world.townSquare.x][world.townSquare.y] * Constants.MESH_THICKNESS
     );
 
     const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
@@ -151,7 +151,7 @@ export const drawTemple = (templeCoords: Point, heightmap: HeightMap, mesh: THRE
     const docksPosition = new THREE.Vector3(
       docksCoords.x - geometry.parameters.width / 2,
       (heightmap.length - docksCoords.y) - geometry.parameters.height / 2,
-      heightmap[docksCoords.x][docksCoords.y] * MESH_THICKNESS
+      heightmap[docksCoords.x][docksCoords.y] * Constants.MESH_THICKNESS
     );
 
     const platformGeometry = new THREE.BoxGeometry(1.2, 1.2, 0.1);
@@ -320,7 +320,7 @@ export const createFlowDiagram = (flowDirections: (number | null)[][]): THREE.Gr
       for (let j = 0; j < gridSize; j++) {
           const flowDirection = flowDirections[i][j];
           if (!(flowDirection === null)) {
-            const offset = DIRECTION_OFFSETS[flowDirection];
+            const offset = Constants.DIRECTION_OFFSETS[flowDirection];
             // Convert the angle in radians to a direction vector
             const arrowDir = new THREE.Vector3(offset[0], -offset[1], 0).normalize();
             // Create the ArrowHelper with the direction vector
@@ -426,3 +426,42 @@ export const drawTreesOnMap = (waterAccumulation: WaterAccumulationMap, heightma
 
   return ret;
 }
+
+export const drawSheep = (basePosition: THREE.Vector3) => {
+  // Create the main icosahedron body
+  const bodyMaterial = new THREE.MeshBasicMaterial({ color: Constants.DEFAULT_SHEEP_WHITE_COLOR, wireframe: false });
+  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), bodyMaterial);
+  const headMaterial = new THREE.MeshBasicMaterial({ color: Constants.DEFAULT_SHEEP_BLACK_COLOR, wireframe: false });
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), headMaterial);
+  body.position.set(basePosition.x, basePosition.y, basePosition.z + 0.6);
+  head.position.set(basePosition.x + 0.5, basePosition.y, basePosition.z + 0.7);
+
+  // Function to create cylindrical legs
+  const createLeg = (radiusTop: number, radiusBottom: number, height: number, radialSegments: number, color: string) => {
+    const legGeometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments);
+    const legMaterial = new THREE.MeshBasicMaterial({ color: color });
+    const leg = new THREE.Mesh(legGeometry, legMaterial);
+    leg.rotation.x = Math.PI / 2;
+    return leg;
+  }
+
+  // Create four legs and position them relative to the icosahedron
+  const leg1 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg2 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg3 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+  const leg4 = createLeg(0.1, 0.1, 0.75, 5, Constants.DEFAULT_SHEEP_BLACK_COLOR);
+
+  // Position each leg around the icosahedron
+  leg1.position.set(basePosition.x -0.5, basePosition.y -0.5, basePosition.z);
+  leg2.position.set(basePosition.x + 0.5, basePosition.y -0.5, basePosition.z);
+  leg3.position.set(basePosition.x -0.5, basePosition.y + 0.5, basePosition.z);
+  leg4.position.set(basePosition.x + 0.5, basePosition.y + 0.5, basePosition.z);
+
+  const appendages = [body, head, leg1, leg2, leg3, leg4];
+
+  const sheep = new THREE.Group();
+
+  appendages.forEach((appendage) => sheep.add(appendage));
+
+  return sheep;
+};

@@ -4,39 +4,7 @@ import { OrbitControls } from "three/examples/jsm/Addons.js";
 import * as Constants from '@/constants';
 import { FPSControls } from "@/FPSControls";
 import { intersectPlane } from "@/app/models";
-import { ColorsConfig } from "@/types";
-
-export enum CameraMode {
-    FreeFloat,
-    Walking,
-    FlyHack
-  }
-
-export interface InputState {
-    moveForward: boolean;
-    moveBackward: boolean;
-    moveLeft: boolean;
-    moveRight: boolean;
-    canJump: boolean;
-}
-
-export interface GameEnvironmentLighting {
-    ambientLight: THREE.AmbientLight;
-    directionalLight: THREE.DirectionalLight;
-}
-
-export interface GameEnvironmentLayers {
-     terrainMesh: THREE.Mesh | null;
-     waterMesh: THREE.Mesh | null;
-     flares: (THREE.Mesh | null)[];
-     structures: THREE.Mesh[];
-     roads: THREE.Line[];
-     arrows: THREE.Group | null;
-     waterAccumulation: THREE.Group | null;
-     treesGroups: THREE.Group[];
-
-    [key: string]: THREE.Mesh | THREE.Line | THREE.Group | (THREE.Mesh | null)[] | THREE.Mesh[] | THREE.Line[] | THREE.Group[] | null;
-}
+import { CameraMode, ColorsConfig, GameEnvironmentLayers, GameEnvironmentLighting, InputState, LayerObject } from "@/types";
 
 const EMPTY_LAYERS = {
     terrainMesh: null,
@@ -46,11 +14,9 @@ const EMPTY_LAYERS = {
     roads: [],
     arrows: null,
     waterAccumulation: null,
-    treesGroups: []
+    treesGroups: [],
+    mobs: [],
 }
-
-export type LayerType = THREE.Mesh | THREE.Line | THREE.Group;
-export type LayerObject = LayerType | (LayerType | null)[];
 
 export class GameEnvironment {
     clock: THREE.Clock;
@@ -103,7 +69,7 @@ export class GameEnvironment {
 
         this.lighting = {
             ambientLight: new THREE.AmbientLight(colorsConfig.ambientLight),
-            directionalLight: new THREE.DirectionalLight(colorsConfig.directionalLight, 100)
+            directionalLight: new THREE.DirectionalLight(colorsConfig.directionalLight)
         };
 
         this.lighting.directionalLight.position.set(50, 50, 50);
@@ -205,11 +171,16 @@ export class GameEnvironment {
 
     removeLayer<K extends keyof GameEnvironmentLayers>(layerName: K) {
         const layer = this.layers[layerName];
+
+        console.log("Removing layer ", layerName);
+
         if (Array.isArray(layer)) {
             layer.forEach(obj => {
                 if (obj) this.scene.remove(obj);
             });
         } else {
+            console.log("removing object.");
+            console.log(layer);
             // If it's a single object, remove it from the scene
             if (layer) this.scene.remove(layer as any);
         }
@@ -233,12 +204,17 @@ export class GameEnvironment {
         } else {
             this.layers[layerName] = newObject as GameEnvironmentLayers[K];
         }
+    }
 
-        // Add the object(s) to the scene
-        if (Array.isArray(newObject)) {
-            newObject.forEach(obj => { if (obj) this.scene.add(obj) });
+    drawLayer(layerName: string) {
+        const drawTarget = this.layers[layerName];
+
+        if (!drawTarget) return;
+
+         if (Array.isArray(drawTarget)) {
+            drawTarget.forEach(obj => { if (obj) this.scene.add(obj) });
         } else {
-            this.scene.add(newObject);
+            this.scene.add(drawTarget);
         }
     }
 
@@ -388,6 +364,14 @@ export class GameEnvironment {
         } else if (this.cameraMode === CameraMode.FreeFloat) {
             (this.controls as OrbitControls).update();
         }
+    }
+
+    setDirectionalLight (color: string) {
+        this.lighting.directionalLight = new THREE.DirectionalLight(color);
+    }
+
+    setAmbientLight (color: string) {
+        this.lighting.ambientLight = new THREE.AmbientLight(color);
     }
 }
 

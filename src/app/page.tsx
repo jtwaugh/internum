@@ -80,6 +80,7 @@ export default function Home() {
       showWaterAccumulation: false,
       showFlowDirections: false,
       showTrees: true,
+      showMobs: true,
     }
   )
 
@@ -152,8 +153,21 @@ export default function Home() {
   }, [currentParams]);
 
   useEffect(() => {
-    //console.log(currentDisplayParams);
+    console.log(currentDisplayParams);
   }, [currentDisplayParams]);
+
+  // Define a configuration array for each layer toggle
+  const layerConfig = [
+    { id: 'show-terrain', label: 'Show terrain', key: 'drawTerrain' },
+    { id: 'show-water-level', label: 'Show water', key: 'drawWater' },
+    { id: 'show-structures', label: 'Show structures', key: 'drawStructures' },
+    { id: 'show-roads', label: 'Show roads', key: 'drawRoads' },
+    { id: 'show-structure-flares', label: 'Show structure flares', key: 'showStructureFlares' },
+    { id: 'show-water-accumulation', label: 'Show water accumulation', key: 'showWaterAccumulation' },
+    { id: 'show-flow-direction', label: 'Show flow direction', key: 'showFlowDirections' },
+    { id: 'show-trees', label: 'Show trees', key: 'showTrees' },
+    { id: 'show-mobs', label: 'Show mobs', key: 'showMobs' }
+  ];
 
   return (
     <div className='flex flex-col w-full  min-h-screen bg-slate-100'>
@@ -215,110 +229,21 @@ export default function Home() {
             <MenubarMenu>
               <MenubarTrigger>🔍 View</MenubarTrigger>
               <MenubarContent>
-              <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.drawTerrain}
-                    id='show-terrain' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, drawTerrain: !currentDisplayParams.drawTerrain};
-                        
+              {
+                layerConfig.map(({ id, label, key }) => (
+                  <MenubarItem key={id} onSelect={(e) => e.preventDefault()}>
+                    <Checkbox
+                      checked={currentDisplayParams[key]}
+                      id={id}
+                      onClick={() => {
+                        const newParams = { ...currentDisplayParams, [key]: !currentDisplayParams[key] };
                         setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-terrain' className='px-2'>Show terrain</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.drawWater}
-                    id='show-water-level' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, drawWater: !currentDisplayParams.drawWater};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-water-level' className='px-2'>Show water</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.drawStructures}
-                    id='show-structures' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, drawStructures: !currentDisplayParams.drawStructures};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-structures' className='px-2'>Show structures</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.drawRoads}
-                    id='show-structures' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, drawRoads: !currentDisplayParams.drawRoads};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-structures' className='px-2'>Show roads</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.showStructureFlares}
-                    id='show-structure-flares' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, showStructureFlares: !currentDisplayParams.showStructureFlares};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-structure-flares' className='px-2'>Show structure flares</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.showWaterAccumulation}
-                    id='show-water-accumulation' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, showWaterAccumulation: !currentDisplayParams.showWaterAccumulation};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-water-accumulation' className='px-2'>Show water accumulation</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.showFlowDirections}
-                    id='show-flow-direction' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, showFlowDirections: !currentDisplayParams.showFlowDirections};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-flow-direction' className='px-2'>Show flow direction</Label>
-                </MenubarItem>
-                <MenubarItem onSelect={(e)=>{e.preventDefault()}}>
-                  <Checkbox 
-                    checked={currentDisplayParams.showTrees}
-                    id='show-trees' 
-                    onClick={
-                      () => {
-                        const newParams = {...currentDisplayParams, showTrees: !currentDisplayParams.showTrees};
-                        
-                        setCurrentDisplayParams(newParams);
-                    }}
-                  />
-                  <Label htmlFor='show-trees' className='px-2'>Show trees</Label>
-                </MenubarItem>
+                      }}
+                    />
+                    <Label htmlFor={id} className="px-2">{label}</Label>
+                  </MenubarItem>
+                ))
+              }
               </MenubarContent>
             </MenubarMenu>
           </Menubar>

@@ -8,6 +8,8 @@ export const DEFAULT_GRADIENT = ["#cbbd98", "#aaff00", "#aaff88", "#ffffff"];
 export const DEFAULT_AMBIENT_LIGHT_COLOR = "#ffffff";
 export const DEFAULT_DIRECTIONAL_LIGHT_COLOR = "#ffffff";
 export const DEFAULT_WATER_COLOR = "#0099ee";
+export const DEFAULT_SHEEP_WHITE_COLOR = "#aaaaaa";
+export const DEFAULT_SHEEP_BLACK_COLOR = "#222222";
 
 export const DEFAULT_NOISE_SCALE = 0.1;
 export const DEFAULT_CANVAS_SIZE = 400;
