@@ -5,6 +5,7 @@ import * as Constants from '@/constants';
 import { FPSControls } from "@/FPSControls";
 import { intersectPlane } from "@/app/models";
 import { CameraMode, ColorsConfig, GameEnvironmentLayers, GameEnvironmentLighting, InputState, LayerObject } from "@/types";
+import {Mob} from "./mob";
 
 const EMPTY_LAYERS = {
     terrainMesh: null,
@@ -15,7 +16,6 @@ const EMPTY_LAYERS = {
     arrows: null,
     waterAccumulation: null,
     treesGroups: [],
-    mobs: [],
 }
 
 export class GameEnvironment {
@@ -45,6 +45,9 @@ export class GameEnvironment {
     moveSpeed: number = 10;
 
     layers: GameEnvironmentLayers = EMPTY_LAYERS;
+
+    // These need to be separate from the terrain layers because they can move
+    mobs: Mob[] = [];
 
     lighting: GameEnvironmentLighting;
     
@@ -172,14 +175,12 @@ export class GameEnvironment {
     removeLayer<K extends keyof GameEnvironmentLayers>(layerName: K) {
         const layer = this.layers[layerName];
 
-        console.log("Removing layer ", layerName);
-
         if (Array.isArray(layer)) {
             layer.forEach(obj => {
                 if (obj) this.scene.remove(obj);
             });
         } else {
-            console.log("removing object.");
+            console.log("Removing layer ", layerName);
             console.log(layer);
             // If it's a single object, remove it from the scene
             if (layer) this.scene.remove(layer as any);

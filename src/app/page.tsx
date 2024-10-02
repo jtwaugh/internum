@@ -16,7 +16,7 @@ import React, { useState, useEffect } from "react";
 
 import * as Constants from '@/constants';
 
-import { ColorsConfig, DisplayParams, World, WorldGenParams } from '@/types';
+import { ColorsConfig, TerrainLayersDisplayParams, World, WorldGenParams } from '@/types';
 
 import {
   Menubar,
@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from '@/components/ui/separator';
 
 
 // Function to serialize the current configuration
@@ -70,7 +71,7 @@ export default function Home() {
         erosionIterations: Constants.DEFAULT_EROSION_ITERATIONS,
     }
   )
-  const [currentDisplayParams, setCurrentDisplayParams] = useState<DisplayParams>(
+  const [terrainDisplayParams, setTerrainDisplayParams] = useState<TerrainLayersDisplayParams>(
     {
       drawTerrain: true,
       drawWater: true,
@@ -80,9 +81,10 @@ export default function Home() {
       showWaterAccumulation: false,
       showFlowDirections: false,
       showTrees: true,
-      showMobs: true,
     }
   )
+
+  const [displayMobs, setDisplayMobs] = useState<boolean>(true);
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -153,8 +155,8 @@ export default function Home() {
   }, [currentParams]);
 
   useEffect(() => {
-    console.log(currentDisplayParams);
-  }, [currentDisplayParams]);
+    console.log(terrainDisplayParams);
+  }, [terrainDisplayParams]);
 
   // Define a configuration array for each layer toggle
   const layerConfig = [
@@ -166,7 +168,6 @@ export default function Home() {
     { id: 'show-water-accumulation', label: 'Show water accumulation', key: 'showWaterAccumulation' },
     { id: 'show-flow-direction', label: 'Show flow direction', key: 'showFlowDirections' },
     { id: 'show-trees', label: 'Show trees', key: 'showTrees' },
-    { id: 'show-mobs', label: 'Show mobs', key: 'showMobs' }
   ];
 
   return (
@@ -233,21 +234,32 @@ export default function Home() {
                 layerConfig.map(({ id, label, key }) => (
                   <MenubarItem key={id} onSelect={(e) => e.preventDefault()}>
                     <Checkbox
-                      checked={currentDisplayParams[key]}
+                      checked={terrainDisplayParams[key]}
                       id={id}
                       onClick={() => {
-                        const newParams = { ...currentDisplayParams, [key]: !currentDisplayParams[key] };
-                        setCurrentDisplayParams(newParams);
+                        const newParams = { ...terrainDisplayParams, [key]: !terrainDisplayParams[key] };
+                        setTerrainDisplayParams(newParams);
                       }}
                     />
                     <Label htmlFor={id} className="px-2">{label}</Label>
                   </MenubarItem>
                 ))
               }
+              <Separator/>
+              <MenubarItem key="mobs" onSelect={(e) => e.preventDefault()}>
+                  <Checkbox
+                    checked={displayMobs}
+                    id="show-mobs"
+                    onClick={() => {
+                      setDisplayMobs(!displayMobs);
+                    }}
+                  />
+                  <Label htmlFor="show-mobs" className="px-2">Show Mobs</Label>
+                </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           </Menubar>
-          <ThreeScene world={currentWorld} colorsConfig={currentColors} displayParams={currentDisplayParams} handleFullscreenChange={setIsFullscreen}/>
+          <ThreeScene world={currentWorld} colorsConfig={currentColors} displayParams={terrainDisplayParams} handleFullscreenChange={setIsFullscreen}/>
         </div>
       </div>
       

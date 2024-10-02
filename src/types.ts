@@ -6,20 +6,30 @@ export type SlopeMap = (number | null)[][];
 export type WaterAccumulationMap = number[][];
 export type MapMask = boolean[][];
 
+export enum MobType {
+  SHEEP
+};
+
+export interface MobProps {
+  type: MobType;
+  initialLocation: THREE.Vector3;
+  initialState: string;
+};
+
 export interface World {
-    heightmap: HeightMap; 
-    waterLevel: number; // Hack
-    oceanTiles: MapMask;
-    flowDirections: SlopeMap;
-    waterAccumulation: WaterAccumulationMap;
-    // Locations for generating the town
-    townSquare: Point;
-    // If the island is small enough, these structures won't generate
-    temple: Point | null;
-    docks: Point | null;
-    templePath: Point[] | null,
-    docksPath: Point[] | null
-  }
+  heightmap: HeightMap; 
+  waterLevel: number; // Hack
+  oceanTiles: MapMask;
+  flowDirections: SlopeMap;
+  waterAccumulation: WaterAccumulationMap;
+  // Locations for generating the town
+  townSquare: Point;
+  // If the island is small enough, these structures won't generate
+  temple: Point | null;
+  docks: Point | null;
+  templePath: Point[] | null,
+  docksPath: Point[] | null
+}
 
 export interface ColorsConfig {
   terrainGradient: string[];
@@ -39,7 +49,7 @@ export interface WorldGenParams {
   erosionIterations: number;
 }
 
-export interface DisplayParams {
+export interface TerrainLayersDisplayParams {
   drawTerrain: boolean;
   drawWater: boolean;
   drawStructures: boolean;
@@ -48,7 +58,6 @@ export interface DisplayParams {
   showFlowDirections: boolean;
   showWaterAccumulation: boolean;
   showTrees: boolean;
-  showMobs: boolean;
 
   [key: string]: boolean;
 }
@@ -75,7 +84,6 @@ export interface GameEnvironmentLayers {
    arrows: THREE.Group | null;
    waterAccumulation: THREE.Group | null;
    treesGroups: THREE.Group[];
-   mobs: THREE.Group[];
 
   [key: string]: THREE.Mesh | THREE.Line | THREE.Group | (THREE.Mesh | null)[] | THREE.Mesh[] | THREE.Line[] | THREE.Group[] | null;
 }

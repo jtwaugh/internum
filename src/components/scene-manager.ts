@@ -9,11 +9,9 @@ import {
     createWaterAccumulationField,
     createPath,
     drawDocks,
-    drawTreesOnMap,
-    drawSheep,
-    drawSheepOnMap
+    drawTreesOnMap
 } from '@/app/models';
-import { ColorsConfig, DisplayParams, LayerObject, World } from '@/types';
+import { ColorsConfig, TerrainLayersDisplayParams, LayerObject, World, GameEnvironmentLayers } from '@/types';
 import { GameEnvironment } from '@/app/game-logic';
 
 
@@ -21,7 +19,22 @@ export class SceneManager {
     world: World;
     colorsConfig: ColorsConfig;
     env: GameEnvironment;
+
     layerConfig: {[flagName: string]: string};
+    cachedLayers: {[layerName: string]: LayerObject} = {};
+
+    dependencies: { [layerName: string]: string[] } = {
+      terrainMesh: [],
+      waterMesh: ['terrainMesh'],
+      structures: ['terrainMesh'],
+      roads: [],
+      flares: ['terrainMesh'],
+      waterAccumulation: [],
+      treesGroups: ['terrainMesh'],
+      arrows: [] // If necessary, add dependencies here
+    };
+
+    drawOrder: string[];
 
     constructor (renderer: THREE.WebGLRenderer, world: World, colorsConfig: ColorsConfig) {
         this.world = world;
@@ -37,8 +50,70 @@ export class SceneManager {
             showFlowDirections: "arrows", 
             showWaterAccumulation: "waterAccumulation", 
             showTrees: "treesGroups",
-            showMobs: "mobs" 
         };
+
+
+        function topologicalSort(dependencies: { [key: string]: string[] }): string[] {
+          const inDegree: { [key: string]: number } = {};
+          const adjList: { [key: string]: string[] } = {};
+          const sorted: string[] = [];
+          const queue: string[] = [];
+      
+          // Initialize in-degree and adjacency list
+          for (const layer in dependencies) {
+              inDegree[layer] = 0;
+              adjList[layer] = [];
+          }
+      
+          // Build the graph
+          for (const [layer, deps] of Object.entries(dependencies)) {
+              for (const dep of deps) {
+                  adjList[dep].push(layer);
+                  inDegree[layer]++;
+              }
+          }
+      
+          // Enqueue nodes with no dependencies (in-degree 0)
+          for (const [layer, degree] of Object.entries(inDegree)) {
+              if (degree === 0) {
+                  queue.push(layer);
+              }
+          }
+      
+          // Process nodes
+          while (queue.length > 0) {
+              const current = queue.shift()!;
+              sorted.push(current);
+      
+              for (const neighbor of adjList[current]) {
+                  inDegree[neighbor]--;
+                  if (inDegree[neighbor] === 0) {
+                      queue.push(neighbor);
+                  }
+              }
+          }
+      
+          // Check if there's a cycle
+          if (sorted.length !== Object.keys(dependencies).length) {
+              throw new Error("Cycle detected in dependencies, topological sort not possible");
+          }
+      
+          return sorted;
+      }
+
+      // Get the sorted order of draw functions based on dependencies
+      this.drawOrder = topologicalSort(this.dependencies);
+      
+      for (const layerName of this.drawOrder) {
+        console.log("Regenerating ", layerName);
+        const generatedLayer = this.drawFunctions[layerName]();
+
+        if (!generatedLayer) continue;
+
+        this.cachedLayers[layerName] = generatedLayer;
+
+        console.log(generatedLayer);
+      }
     }
 
     handleKeyDown (event: globalThis.KeyboardEvent) {
@@ -66,8 +141,13 @@ export class SceneManager {
           return waterMesh;
         },
         structures: () => {
-          if (!this.env.layers.terrainMesh) return;
-          const terrainMesh = this.env.layers.terrainMesh!;
+          let deps: {[layerName: string]: LayerObject} = {};
+          for (const dependentLayer of this.dependencies.structures) {
+            if (!this.cachedLayers[dependentLayer]) return;
+            deps[dependentLayer] = this.cachedLayers[dependentLayer]!;
+          }
+          const terrainMesh = deps["terrainMesh"] as THREE.Mesh;
+          
           let structures: THREE.Mesh[] = [];
       
           if (this.world.temple) {
@@ -98,8 +178,13 @@ export class SceneManager {
           return roads;
         },
         flares: () => {
-          if (!this.env.layers.terrainMesh) return;
-          const terrainMesh = this.env.layers.terrainMesh!;
+          let deps: {[layerName: string]: LayerObject} = {};
+          for (const dependentLayer of this.dependencies.flares) {
+            if (!this.cachedLayers[dependentLayer]) return;
+            deps[dependentLayer] = this.cachedLayers[dependentLayer]!;
+          }
+          const terrainMesh = deps["terrainMesh"] as THREE.Mesh;
+
           const flares = drawTownLocations(this.world, terrainMesh);
           return flares;
         },
@@ -108,8 +193,13 @@ export class SceneManager {
           return waterAccumulation;
         },
         treesGroups: () => {
-          if (!this.env.layers.terrainMesh) return;
-          const terrainMesh = this.env.layers.terrainMesh!;
+          let deps: {[layerName: string]: LayerObject} = {};
+          for (const dependentLayer of this.dependencies.treesGroups) {
+            if (!this.cachedLayers[dependentLayer]) return;
+            deps[dependentLayer] = this.cachedLayers[dependentLayer]!;
+          }
+          const terrainMesh = deps["terrainMesh"] as THREE.Mesh;
+
           const treesGroups = drawTreesOnMap(this.world.waterAccumulation, this.world.heightmap, this.world.waterLevel, terrainMesh);
           return treesGroups;
         },
@@ -117,11 +207,6 @@ export class SceneManager {
           const arrows = createFlowDiagram(this.world.flowDirections);
           return arrows;
         },
-        mobs: () => {
-            const terrainMesh = this.env.layers.terrainMesh!;
-            const sheep = drawSheepOnMap(this.world.heightmap, this.world.waterLevel, terrainMesh);
-            return sheep;
-          }
       };
 
       // When a display param gets turned back on, we need to repopulate the scene with the thing it's supposed to draw
@@ -135,7 +220,7 @@ export class SceneManager {
         if (!value) {
             this.env.removeLayer(layerName);
         } else {
-            const drawTarget = this.drawFunctions[layerName]();
+            const drawTarget = this.cachedLayers[layerName];
 
             if (!drawTarget) return;
             
@@ -144,12 +229,12 @@ export class SceneManager {
         }        
       }
 
-      resetScene (displayParams: DisplayParams) {
+      resetScene (displayParams: TerrainLayersDisplayParams) {
         this.env.emptySceneBuffer();
         this.env.clock = new THREE.Clock();
         this.env.returnToOverview();
         
-        let paramName: keyof DisplayParams;
+        let paramName: keyof TerrainLayersDisplayParams;
         for (paramName in displayParams) this.toggleLayer(paramName, displayParams[paramName]);
         
         this.env.resetLights();

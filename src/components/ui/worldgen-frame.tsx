@@ -21,10 +21,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
-import { World, ColorsConfig, WorldGenParams } from '@/types';
+import { World, ColorsConfig, WorldGenParams, MobProps } from '@/types';
 import GradientBuilder from './gradient-builder';
 import { ColorHexInput } from './color-hex-input';
 import { generateWorldTerrain, getRandomLandTile, findHighestPoint, accumulateWater, computeFlowDirection, floodFillOcean, erodeHeightmap } from '@/world-gen';
+import { spawnSheep } from '@/app/spawn-logic';
+import { drawSheep } from '@/app/models';
 
 
 interface IslandGeneratorProps {
@@ -101,6 +103,8 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       erosionIterations: erosionIterations,
     };
     
+    // First terrain
+
     const blurredHeightmap = generateWorldTerrain(params);
 
     const oceanTiles = floodFillOcean(blurredHeightmap, params);
@@ -120,6 +124,7 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
       }
     }
     
+    // Now structures
 
     const townSquarePosition = getRandomLandTile(erodedHeightmap, params.waterLevel);
 
@@ -165,7 +170,6 @@ const IslandGenerator: React.FC<IslandGeneratorProps> = (props: IslandGeneratorP
     // const townSquarePosition = {x: 0, y: 0};
     // const templePosition = {x: 0, y: 0};
     // const docksPosition = {x: 0, y: 0};
-
 
     // TODO ocean tiles not necessarily correct
     props.onWorldGenerated(

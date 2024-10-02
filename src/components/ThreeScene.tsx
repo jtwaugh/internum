@@ -5,14 +5,14 @@ import * as THREE from 'three';
 
 import { Button } from './ui/button';
 
-import { ColorsConfig, DisplayParams, World } from '@/types';
+import { ColorsConfig, TerrainLayersDisplayParams, World } from '@/types';
 
 import { SceneManager } from './scene-manager';
 
 export interface ThreeSceneProps {
   world: World | null;
   colorsConfig: ColorsConfig;
-  displayParams: DisplayParams;
+  displayParams: TerrainLayersDisplayParams;
   handleFullscreenChange: Function;
 }
 
@@ -76,9 +76,9 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
     };
   }, []);
 
-  let keyName: keyof DisplayParams;
+  let keyName: keyof TerrainLayersDisplayParams;
   for (keyName in props.displayParams) {
-    useDisplayParamEffect(props.displayParams[keyName], keyName, (paramName) => {sceneManagerRef.current?.toggleLayer(paramName, props.displayParams[paramName]);});
+    useDisplayParamEffect(props.displayParams[keyName], keyName, (paramName) => {sceneManagerRef.current?.toggleLayer(paramName, props.displayParams[paramName]);}); 
   }
 
   useEffect(() => {
@@ -90,6 +90,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
   }, [props.colorsConfig.ambientLight]);
 
 
+  // On new world generation
   useEffect(() => {
     if (!mountRef.current || !rendererRef.current || !props.world) return;
 
@@ -97,7 +98,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
 
     const sm = sceneManagerRef.current;
 
-    if (!sm) return;
+    if (!sm) return; 
 
     sm.resetScene(props.displayParams);
     let animationId: number;
