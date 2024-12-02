@@ -1,169 +1,196 @@
 "use client"
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/Addons.js';
+
 import { Button } from './ui/button';
 
-interface ThreeSceneProps {
-  mesh: THREE.Mesh | null;
+import { ColorsConfig, TerrainLayersDisplayParams, World } from '@/types';
+
+import { SceneManager } from './scene-manager';
+
+export interface ThreeSceneProps {
+  world: World | null;
+  colorsConfig: ColorsConfig;
+  displayParams: TerrainLayersDisplayParams;
+  handleFullscreenChange: Function;
 }
 
+const useDisplayParamEffect = (
+  paramValue: boolean,
+  paramName: string,
+  callback: (paramName: string) => void
+) => {
+  useEffect(() => {
+    console.log(`Display parameter ${paramName} changed.`);
+    callback(paramName);
+  }, [paramValue]);
+};
+
 const ThreeScene: React.FC<ThreeSceneProps> = (props: ThreeSceneProps) => {
+  // Components
   const mountRef = useRef<HTMLDivElement>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
-  const lightRef = useRef<THREE.DirectionalLight | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const fullscreenButton = document.getElementById('fullscreen-btn');
+  const [cameraModeString, setCameraModeString] = useState<string>("Free Float");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const sceneManagerRef = useRef<SceneManager | null>(null);
+
+  const resizeRendererToDisplaySize = () => {
+    const width = mountRef.current?.clientWidth;
+    const height = mountRef.current?.clientHeight;
+  
+    // Set the renderer size
+    rendererRef.current?.setSize(width!, height!);
+    sceneManagerRef.current?.handleDisplayResize(width!, height!);
+  }
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!rendererRef.current) {
+      rendererRef.current = new THREE.WebGLRenderer({ antialias: true });
+    }
+    mountRef.current!.appendChild(rendererRef.current.domElement);
+    resizeRendererToDisplaySize();
 
-    // Initialize the scene, camera, and renderer
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, 1.5, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(600, 400);
-    mountRef.current.appendChild(renderer.domElement);
-    sceneRef.current = scene;
-
-    camera.position.set(0, 50, 100);
-    cameraRef.current = camera;
-
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040); // Soft ambient light
-    scene.add(ambientLight);
-    ambientLightRef.current = ambientLight;
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(50, 50, 50);
-    scene.add(directionalLight);
-    lightRef.current = directionalLight;
-
-    // OrbitControls setup
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controlsRef.current = controls;
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
+    // Constructor: KeyEvents setup
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      sceneManagerRef.current?.handleKeyDown(event);
     };
+
+    const handleKeyUp = (event: globalThis.KeyboardEvent) => {
+      sceneManagerRef.current?.handleKeyUp(event);
+    };
+
+    window.addEventListener('resize', resizeRendererToDisplaySize);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    // Return cleanup callback
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      mountRef.current?.removeChild(rendererRef.current!.domElement);
+      rendererRef.current!.dispose();
+    };
+  }, []);
+
+  let keyName: keyof TerrainLayersDisplayParams;
+  for (keyName in props.displayParams) {
+    useDisplayParamEffect(props.displayParams[keyName], keyName, (paramName) => {sceneManagerRef.current?.toggleLayer(paramName, props.displayParams[paramName]);}); 
+  }
+
+  useEffect(() => {
+    sceneManagerRef.current?.env.setDirectionalLight(props.colorsConfig.directionalLight);
+  }, [props.colorsConfig.directionalLight]);
+
+  useEffect(() => {
+    sceneManagerRef.current?.env.setAmbientLight(props.colorsConfig.ambientLight);
+  }, [props.colorsConfig.ambientLight]);
+
+
+  // On new world generation
+  useEffect(() => {
+    if (!mountRef.current || !rendererRef.current || !props.world) return;
+
+    sceneManagerRef.current = new SceneManager(rendererRef.current, props.world, props.colorsConfig);
+
+    const sm = sceneManagerRef.current;
+
+    if (!sm) return; 
+
+    sm.resetScene(props.displayParams);
+    let animationId: number;
+
+    const animate = () => {
+        animationId = requestAnimationFrame(animate);
+        sm.env.advanceFrame();
+        rendererRef.current!.render(sm.env.scene, sm.env.camera);
+    };
+
     animate();
 
-    // Clean up on unmount
-    return () => {
-      mountRef.current?.removeChild(renderer.domElement);
-      renderer.dispose();
-    };
-  }, []);
+    return () => cancelAnimationFrame(animationId);
+  }, [props.world]);
 
-  useEffect(() => {
-    if (props.mesh && sceneRef.current) {
-      console.log(props.mesh);
-      sceneRef.current.clear(); // Clear previous mesh
-      sceneRef.current.add(props.mesh); // Add the new mesh
-
-      if (ambientLightRef.current) {
-        sceneRef.current.add(ambientLightRef.current);
-      }
-
-      if (lightRef.current) {
-        sceneRef.current.add(lightRef.current);
-      }
+  const onFullscreenClick = () => {
+    return;
+    const shouldBeFullscreen = !isFullscreen;
+    if (shouldBeFullscreen) {
+      rendererRef.current!.setSize(window.innerWidth, window.innerHeight);
+    } else {
+      resizeRendererToDisplaySize();
     }
-  }, [props.mesh]);
-
-  // Adjust the camera's field of view (FOV) for zooming
-  const handleZoomIn = () => {
-    if (cameraRef.current) {
-      cameraRef.current.fov = Math.max(cameraRef.current.fov - 5, 10); // Minimum FOV of 10
-      cameraRef.current.updateProjectionMatrix();
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (cameraRef.current) {
-      cameraRef.current.fov = Math.min(cameraRef.current.fov + 5, 100); // Maximum FOV of 100
-      cameraRef.current.updateProjectionMatrix();
-    }
-  };
-
-  const handleResetView = () => {
-    if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(0, 50, 100);
-      cameraRef.current.fov = 75; // Reset FOV to default
-      cameraRef.current.updateProjectionMatrix();
-      controlsRef.current.reset();
-    }
-  };
-
-  const handleCoordinatesClick = () => {
-    if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(100, 100, 100);
-      controlsRef.current.reset();
-    }
-  };
-
-  // Handle WASD movement based on camera's local axes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (!cameraRef.current) return;
-
-        const moveSpeed = 2;
-        const direction = new THREE.Vector3();
-        cameraRef.current.getWorldDirection(direction);
-
-        switch (event.key) {
-          case 'w':
-            cameraRef.current.position.addScaledVector(direction, moveSpeed);
-            break;
-          case 's':
-            cameraRef.current.position.addScaledVector(direction, -moveSpeed);
-            break;
-          case 'a':
-            const rightVector = new THREE.Vector3();
-            cameraRef.current.getWorldDirection(direction);
-            rightVector.crossVectors(cameraRef.current.up, direction).normalize();
-            cameraRef.current.position.addScaledVector(rightVector, -moveSpeed);
-            break;
-          case 'd':
-            const leftVector = new THREE.Vector3();
-            cameraRef.current.getWorldDirection(direction);
-            leftVector.crossVectors(cameraRef.current.up, direction).normalize();
-            cameraRef.current.position.addScaledVector(leftVector, moveSpeed);
-            break;
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-      };
-    };
-  }, []);
+    setIsFullscreen(shouldBeFullscreen);
+    props.handleFullscreenChange(shouldBeFullscreen);
+  }
 
   return (
-    <div className='p-4'>
-      <div ref={mountRef} style={{
-        width: 600,  // Adjust the width of the container
-        height: 400, // Adjust the height of the container
-        border: '1px solid black' // Optional: add a border for visual reference
-      }} />
+    <div ref={containerRef} id='three-container' tabIndex={0} className='p-4 flex-1'>
+      <div className='h-full justify-center'>
+        <div id="fullscreen-button-container" className="relative">
+          <Button id="fullscreen-btn" onClick={onFullscreenClick} className="absolute top-1 right-2 z-10 p-4 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70">
+          『』
+          </Button>
+        </div>
 
-      <Button 
-        className="reset-button" 
-        onClick={handleResetView}
-        style={{ position: 'relative', bottom: '-20px', right: '-10px', zIndex: 10 }}>
-        Reset View
-      </Button>
+        <div id="cameramode-label-container" className='relative'>
+          <div className='flex p-4 absolute top-1 left-1 z-10'>
+            <span className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'>
+              Camera Mode: {cameraModeString}
+            </span>
+          </div>
+        </div>
+
+        <div ref={mountRef} className='h-full w-full bg-primary'/>
+        
+
+        <div id="buttons-container" className='relative'>
+          <div className='flex p-4 absolute bottom-1 left-1 z-10'>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  if (sceneManagerRef.current) {
+                    setCameraModeString("Free Float");
+                    sceneManagerRef.current.env.returnToOverview();
+                  }
+                }}>
+                🗺️
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  if (sceneManagerRef.current) {
+                    setCameraModeString("Free Float");
+                    sceneManagerRef.current.env.moveCameraAbovePosition(new THREE.Vector3(
+                      props.world!.townSquare.x - (sceneManagerRef.current.env.layers.terrainMesh!.geometry as THREE.PlaneGeometry).parameters.width / 2,
+                      (props.world!.heightmap.length - props.world!.townSquare.y) - (sceneManagerRef.current.env.layers.terrainMesh!.geometry as THREE.PlaneGeometry).parameters.height / 2,
+                      10
+                    ));
+                  }
+                }}>
+                🏘️
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  if (sceneManagerRef.current) {
+                    setCameraModeString("Gravity On");
+                    sceneManagerRef.current.env.turnGravityOn();
+                  }
+                }}>
+                🪂
+              </Button>
+              <Button className='px-4 py-2 bg-black bg-opacity-50 text-white border-none cursor-pointer text-sm hover:bg-opacity-70'
+                onClick={() => {
+                  if (sceneManagerRef.current) {
+                    setCameraModeString("Fly-Hack");
+                    sceneManagerRef.current.env.turnFlyHackOn();
+                  }
+                }}>
+                🛩️
+              </Button>
+          </div>
+        </div>  
+      </div>
     </div>
   );
 };
